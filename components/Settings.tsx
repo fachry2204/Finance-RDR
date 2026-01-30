@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Tag, Database, HardDrive, CheckCircle, XCircle, Users, RefreshCw, UserPlus } from 'lucide-react';
-import { AppSettings, DatabaseConfig, GoogleDriveConfig, User } from '../types';
+import { Plus, Trash2, Tag, Database, CheckCircle, XCircle, Users, RefreshCw, UserPlus } from 'lucide-react';
+import { AppSettings, DatabaseConfig, User } from '../types';
 
 interface SettingsProps {
   settings: AppSettings;
@@ -9,12 +9,11 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }) => {
-  const [activeTab, setActiveTab] = useState<'GENERAL' | 'DATABASE' | 'INTEGRATION' | 'USERS'>('GENERAL');
+  const [activeTab, setActiveTab] = useState<'GENERAL' | 'DATABASE' | 'USERS'>('GENERAL');
   
   // Local state
   const [newCategory, setNewCategory] = useState('');
   const [dbConfig, setDbConfig] = useState<DatabaseConfig>(settings.database);
-  const [driveConfig, setDriveConfig] = useState<GoogleDriveConfig>(settings.drive);
   
   // User Management State
   const [users, setUsers] = useState<User[]>([]);
@@ -121,28 +120,6 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }) => {
     }
   };
 
-  // --- Drive Handlers ---
-  const handleConnectDrive = async () => {
-    try {
-      const response = await fetch('/auth/google');
-      const data = await response.json();
-      if (data.url) window.location.href = data.url;
-    } catch (error) {
-      alert("Gagal menghubungi server backend.");
-    }
-  };
-
-  const handleDisconnectDrive = () => {
-     setDriveConfig(prev => ({ ...prev, isConnected: false }));
-     onUpdateSettings({ ...settings, drive: { ...settings.drive, isConnected: false } });
-  };
-
-  const handleAutoUploadToggle = () => {
-    const newVal = !driveConfig.autoUpload;
-    setDriveConfig(prev => ({ ...prev, autoUpload: newVal }));
-    onUpdateSettings({ ...settings, drive: { ...settings.drive, autoUpload: newVal } });
-  }
-
   return (
     <div className="space-y-6 animate-fade-in">
       <h2 className="text-2xl font-bold text-slate-800">Pengaturan Aplikasi</h2>
@@ -166,12 +143,6 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }) => {
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'DATABASE' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
         >
           Database
-        </button>
-        <button
-          onClick={() => setActiveTab('INTEGRATION')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'INTEGRATION' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Integrasi Drive
         </button>
       </div>
 
@@ -312,61 +283,6 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }) => {
               </div>
             </div>
           )}
-
-          {/* --- GOOGLE DRIVE TAB --- */}
-          {activeTab === 'INTEGRATION' && (
-             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
-                  <HardDrive size={20} />
-                </div>
-                <div>
-                   <h3 className="text-lg font-bold text-slate-800">Integrasi Drive</h3>
-                   <p className="text-xs text-slate-500">Backup bukti transaksi.</p>
-                </div>
-              </div>
-
-              {!driveConfig.isConnected ? (
-                <div className="text-center py-10 space-y-4 border-2 border-dashed border-slate-200 rounded-xl">
-                   <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-slate-400">
-                      <HardDrive size={32} />
-                   </div>
-                   <button 
-                      onClick={handleConnectDrive}
-                      className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-6 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-flex items-center gap-2"
-                   >
-                     Sign in with Google
-                   </button>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                   <div className="bg-green-50 border border-green-200 p-4 rounded-lg flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                           <CheckCircle size={20} />
-                         </div>
-                         <div>
-                            <p className="font-bold text-slate-800">Terhubung</p>
-                            <p className="text-sm text-green-600">Token Valid</p>
-                         </div>
-                      </div>
-                      <button onClick={handleDisconnectDrive} className="text-rose-600 hover:text-rose-700 text-sm font-medium">Putuskan</button>
-                   </div>
-
-                   <div className="flex items-center justify-between">
-                         <label className="text-sm font-medium text-slate-700">Auto Upload</label>
-                         <button 
-                            onClick={handleAutoUploadToggle}
-                            className={`w-12 h-6 rounded-full p-1 transition-colors ${driveConfig.autoUpload ? 'bg-blue-600' : 'bg-slate-300'}`}
-                         >
-                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${driveConfig.autoUpload ? 'translate-x-6' : 'translate-x-0'}`} />
-                         </button>
-                      </div>
-                </div>
-              )}
-             </div>
-          )}
-
         </div>
       </div>
     </div>

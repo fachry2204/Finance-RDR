@@ -19,6 +19,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   const [selectedReimb, setSelectedReimb] = useState<Reimbursement | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -64,33 +65,75 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
 
   const calculateTotal = () => items.reduce((sum, i) => sum + i.total, 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const uploadFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        return data.url;
+      } else {
+        throw new Error(data.message || 'Upload gagal');
+      }
+    } catch (err) {
+      console.error('Upload Error:', err);
+      return '';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return alert("Minimal 1 item reimburse.");
     if (!category) return alert("Silakan pilih kategori.");
 
-    const newReimb: Reimbursement = {
-      id: generateId(),
-      date,
-      requestorName,
-      category,
-      activityName,
-      description,
-      items,
-      grandTotal: calculateTotal(),
-      status: 'PENDING',
-      timestamp: Date.now()
-    };
+    setIsSubmitting(true);
 
-    onAddReimbursement(newReimb);
-    setView('LIST');
-    
-    // Reset
-    setRequestorName('');
-    setCategory('');
-    setActivityName('');
-    setDescription('');
-    setItems([]);
+    try {
+      // Process items and upload files if present
+      const processedItems = await Promise.all(items.map(async (item) => {
+        let fileUrl = item.filePreviewUrl; 
+        if (item.file) {
+          const uploadedUrl = await uploadFile(item.file);
+          if (uploadedUrl) {
+            fileUrl = uploadedUrl; 
+          }
+        }
+        const { file, ...rest } = item;
+        return { ...rest, filePreviewUrl: fileUrl };
+      }));
+
+      const newReimb: Reimbursement = {
+        id: generateId(),
+        date,
+        requestorName,
+        category,
+        activityName,
+        description,
+        items: processedItems,
+        grandTotal: calculateTotal(),
+        status: 'PENDING',
+        timestamp: Date.now()
+      };
+
+      onAddReimbursement(newReimb);
+      setView('LIST');
+      
+      // Reset
+      setRequestorName('');
+      setCategory('');
+      setActivityName('');
+      setDescription('');
+      setItems([]);
+    } catch (error) {
+      console.error("Gagal menyimpan reimburse:", error);
+      alert("Terjadi kesalahan.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getStatusColor = (status: ReimbursementStatus) => {
@@ -120,7 +163,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
     setRejectionReason(r.rejectionReason || '');
   }
 
-  const handleUpdateStatus = () => {
+  const handleUpdateStatus = async () => {
     if (!selectedReimb || !tempStatus) return;
 
     // Validation for Success
@@ -135,16 +178,33 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
       return;
     }
 
-    const updatedReimb: Reimbursement = {
-      ...selectedReimb,
-      status: tempStatus,
-      transferProof: transferProofFile || selectedReimb.transferProof,
-      transferProofUrl: transferProofFile ? URL.createObjectURL(transferProofFile) : selectedReimb.transferProofUrl,
-      rejectionReason: tempStatus === 'DITOLAK' ? rejectionReason : undefined
-    };
+    setIsSubmitting(true);
 
-    onUpdateReimbursement(updatedReimb);
-    setSelectedReimb(null); // Close modal
+    try {
+        let proofUrl = selectedReimb.transferProofUrl;
+        
+        // Upload proof if new file selected
+        if (transferProofFile) {
+            const uploadedUrl = await uploadFile(transferProofFile);
+            if (uploadedUrl) {
+                proofUrl = uploadedUrl;
+            }
+        }
+
+        const updatedReimb: Reimbursement = {
+            ...selectedReimb,
+            status: tempStatus,
+            transferProofUrl: proofUrl,
+            rejectionReason: tempStatus === 'DITOLAK' ? rejectionReason : undefined
+        };
+
+        onUpdateReimbursement(updatedReimb);
+        setSelectedReimb(null); // Close modal
+    } catch(e) {
+        alert("Gagal update status");
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -244,8 +304,10 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
           </div>
 
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={() => setView('LIST')} className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Batal</button>
-            <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm shadow-blue-200 dark:shadow-none transition-colors"><Save size={18}/> Simpan Pengajuan</button>
+            <button type="button" disabled={isSubmitting} onClick={() => setView('LIST')} className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">Batal</button>
+            <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm shadow-blue-200 dark:shadow-none transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
+                {isSubmitting ? 'Memproses...' : <><Save size={18}/> Simpan Pengajuan</>}
+            </button>
           </div>
         </form>
       ) : (
@@ -478,9 +540,10 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                         <div className="pt-2 flex justify-end">
                           <button 
                             onClick={handleUpdateStatus}
-                            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+                            disabled={isSubmitting}
+                            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                           >
-                            <Save size={18} /> Simpan Perubahan
+                            {isSubmitting ? <Loader size={18} className="animate-spin" /> : <Save size={18} />} Simpan Perubahan
                           </button>
                         </div>
                       </div>

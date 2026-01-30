@@ -1,15 +1,17 @@
 
 import React from 'react';
-import { LogOut, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon, Calendar, Database } from 'lucide-react';
 import { User } from '../types';
+import { getCurrentDateFormatted } from '../utils';
 
 interface HeaderProps {
   user: User | null;
   onLogoutClick: () => void;
   toggleSidebar: () => void;
+  isDbConnected: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isDbConnected }) => {
   return (
     <header className="h-16 bg-white border-b border-slate-200 fixed top-0 left-0 right-0 z-40 px-4 md:px-6 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
@@ -25,6 +27,21 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar }) =
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Date Display - Hidden on mobile */}
+        <div className="hidden lg:flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+           <Calendar size={14} className="text-slate-400" />
+           {getCurrentDateFormatted()}
+        </div>
+
+        {/* Database Status Indicator */}
+        <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium ${isDbConnected ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`} title={isDbConnected ? "Database Terhubung" : "Database Terputus"}>
+           <Database size={14} />
+           <span className="flex items-center gap-1.5">
+             <span className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+             {isDbConnected ? 'DB Online' : 'DB Offline'}
+           </span>
+        </div>
+
         <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100">
           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
             <UserIcon size={16} />

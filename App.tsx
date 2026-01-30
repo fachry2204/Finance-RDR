@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isDbConnected, setIsDbConnected] = useState(true); // Default true to prevent flash
 
   // App State
   const [activePage, setActivePage] = useState<PageView>('DASHBOARD');
@@ -30,6 +31,39 @@ const App: React.FC = () => {
           setIsLoggedIn(true);
       }
   }, []);
+
+  // --- DATABASE CONNECTION CHECK & AUTO LOGOUT ---
+  const checkDbConnection = async () => {
+    try {
+      const response = await fetch('/api/test-db');
+      const data = await response.json();
+      const isConnected = data.status === 'success';
+      setIsDbConnected(isConnected);
+      return isConnected;
+    } catch (e) {
+      setIsDbConnected(false);
+      return false;
+    }
+  };
+
+  // Poll database connection every 30 seconds
+  useEffect(() => {
+    checkDbConnection(); // Initial check
+    const interval = setInterval(async () => {
+      const connected = await checkDbConnection();
+      
+      // Auto Logout Logic if DB disconnects while logged in
+      if (!connected && isLoggedIn) {
+        localStorage.removeItem('rdr_user');
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+        // Note: The Login component will handle showing the warning modal immediately
+      }
+    }, 30000); 
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
+
 
   const handleLogin = (user: User) => {
       setCurrentUser(user);
@@ -74,7 +108,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && isDbConnected) {
         const fetchData = async () => {
         const txData = await safeFetchJson('/api/transactions');
         if (Array.isArray(txData)) setTransactions(txData);
@@ -83,7 +117,7 @@ const App: React.FC = () => {
         };
         fetchData();
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isDbConnected]);
 
   const handleAddTransaction = async (transaction: Transaction) => {
     setTransactions(prev => [transaction, ...prev]);
@@ -117,7 +151,7 @@ const App: React.FC = () => {
   };
 
   if (!isLoggedIn) {
-      return <Login onLogin={handleLogin} />;
+      return <Login onLogin={handleLogin} isDbConnected={isDbConnected} />;
   }
 
   return (
@@ -128,6 +162,7 @@ const App: React.FC = () => {
         user={currentUser} 
         onLogoutClick={() => setShowLogoutModal(true)} 
         toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        isDbConnected={isDbConnected}
       />
 
       {/* 2. Main Layout (Below Header) */}

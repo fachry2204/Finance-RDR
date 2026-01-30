@@ -12,7 +12,6 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const { google } = require('googleapis');
 const crypto = require('crypto');
 
 const app = express();
@@ -44,17 +43,25 @@ const hashPassword = (password) => {
     return crypto.createHash('sha256').update(password).digest('hex');
 };
 
-// --- GOOGLE DRIVE OAUTH2 SETUP ---
-let oauth2Client = null;
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI
-    );
-}
+// --- FILE UPLOAD STORAGE CONFIGURATION ---
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        // Simpan di folder public/uploads agar bisa diakses langsung via URL
+        const uploadDir = path.join(__dirname, 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        // Generate unique filename: timestamp-random.ext
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'file-' + uniqueSuffix + ext);
+    }
+});
 
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ storage: storage });
 
 // --- API ROUTES ---
 
@@ -125,6 +132,16 @@ app.delete('/api/users/:id', async (req, res) => {
     }
 });
 
+// --- UPLOAD API ---
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ status: 'error', message: 'No file uploaded' });
+    }
+    // Return relative path accessible via static server
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ status: 'success', url: fileUrl });
+});
+
 // --- TRANSACTIONS API ---
 app.get('/api/transactions', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -181,8 +198,8 @@ app.post('/api/transactions', async (req, res) => {
         if (t.items && t.items.length > 0) {
             for (const item of t.items) {
                  await conn.query(
-                    'INSERT INTO transaction_items (id, transaction_id, name, qty, price, total) VALUES (?, ?, ?, ?, ?, ?)',
-                    [item.id, t.id, item.name, item.qty, item.price, item.total]
+                    'INSERT INTO transaction_items (id, transaction_id, name, qty, price, total, file_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [item.id, t.id, item.name, item.qty, item.price, item.total, item.filePreviewUrl || null]
                  );
             }
         }
@@ -256,8 +273,8 @@ app.post('/api/reimbursements', async (req, res) => {
         if (r.items && r.items.length > 0) {
             for (const item of r.items) {
                  await conn.query(
-                    'INSERT INTO reimbursement_items (id, reimbursement_id, name, qty, price, total) VALUES (?, ?, ?, ?, ?, ?)',
-                    [item.id, r.id, item.name, item.qty, item.price, item.total]
+                    'INSERT INTO reimbursement_items (id, reimbursement_id, name, qty, price, total, file_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [item.id, r.id, item.name, item.qty, item.price, item.total, item.filePreviewUrl || null]
                  );
             }
         }
@@ -277,12 +294,12 @@ app.put('/api/reimbursements/:id', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { id } = req.params;
-    const { status, rejectionReason } = req.body;
+    const { status, rejectionReason, transferProofUrl } = req.body;
     
     try {
         await pool.query(
-            'UPDATE reimbursements SET status = ?, rejection_reason = ? WHERE id = ?',
-            [status, rejectionReason || null, id]
+            'UPDATE reimbursements SET status = ?, rejection_reason = ?, transfer_proof_url = IFNULL(?, transfer_proof_url) WHERE id = ?',
+            [status, rejectionReason || null, transferProofUrl || null, id]
         );
         res.json({ status: 'success', message: 'Status updated' });
     } catch (error) {
@@ -291,62 +308,7 @@ app.put('/api/reimbursements/:id', async (req, res) => {
     }
 });
 
-// --- AUTH & DRIVE API ---
-app.get('/auth/google', (req, res) => {
-    if (!oauth2Client) return res.status(500).json({ message: 'Google Client ID belum dikonfigurasi.' });
-    const scopes = ['https://www.googleapis.com/auth/drive.file'];
-    const url = oauth2Client.generateAuthUrl({ access_type: 'offline', scope: scopes, prompt: 'consent' });
-    res.json({ url });
-});
-
-app.get('/auth/google/callback', async (req, res) => {
-    if (!oauth2Client) return res.status(500).send('OAuth Client not configured');
-    const { code } = req.query;
-    try {
-        const { tokens } = await oauth2Client.getToken(code);
-        oauth2Client.setCredentials(tokens);
-        fs.writeFileSync('tokens.json', JSON.stringify(tokens));
-        res.redirect('/settings?status=drive_connected');
-    } catch (error) {
-        console.error(error);
-        res.redirect('/settings?status=drive_failed');
-    }
-});
-
-const loadTokens = () => {
-    if (!oauth2Client) return false;
-    if (fs.existsSync('tokens.json')) {
-        const tokens = JSON.parse(fs.readFileSync('tokens.json'));
-        oauth2Client.setCredentials(tokens);
-        return true;
-    }
-    return false;
-};
-
-app.post('/api/upload-drive', upload.single('file'), async (req, res) => {
-    if (!loadTokens()) return res.status(401).json({ message: 'Google Drive belum terhubung.' });
-    const { folderId } = req.body;
-    const file = req.file;
-    if (!file) return res.status(400).json({ message: 'No file uploaded' });
-
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
-    try {
-        const fileMetadata = {
-            name: file.originalname,
-            parents: folderId && folderId !== 'root' ? [folderId] : []
-        };
-        const media = { mimeType: file.mimetype, body: fs.createReadStream(file.path) };
-        const response = await drive.files.create({
-            requestBody: fileMetadata, media: media, fields: 'id, webViewLink'
-        });
-        fs.unlinkSync(file.path);
-        res.json({ status: 'success', fileId: response.data.id, url: response.data.webViewLink });
-    } catch (error) {
-        res.status(500).json({ message: 'Upload gagal', error: error.message });
-    }
-});
-
-// --- SERVE STATIC FRONTEND ---
+// --- SERVE STATIC FRONTEND & UPLOADS ---
 const publicPath = path.join(__dirname, 'public');
 
 if (fs.existsSync(publicPath)) {
@@ -354,8 +316,8 @@ if (fs.existsSync(publicPath)) {
     app.use(express.static(publicPath));
     
     app.get('*', (req, res) => {
-        if (req.path.startsWith('/api') || req.path.startsWith('/auth')) {
-            return res.status(404).json({ message: 'API Endpoint Not Found' });
+        if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/uploads')) {
+            return res.status(404).json({ message: 'Not Found' });
         }
         res.sendFile(path.join(publicPath, 'index.html'));
     });

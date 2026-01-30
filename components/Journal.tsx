@@ -22,6 +22,7 @@ const Journal: React.FC<JournalProps> = ({
   categories
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>(initialView);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -89,29 +90,72 @@ const Journal: React.FC<JournalProps> = ({
     return items.reduce((sum, item) => sum + item.total, 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const uploadFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        return data.url;
+      } else {
+        throw new Error(data.message || 'Upload gagal');
+      }
+    } catch (err) {
+      console.error('Upload Error:', err);
+      return '';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!category || !activityName || items.length === 0) {
       alert("Mohon lengkapi data wajib dan minimal 1 item.");
       return;
     }
 
-    const newTransaction: Transaction = {
-      id: generateId(),
-      date,
-      type,
-      expenseType: type === 'PENGELUARAN' ? expenseType : undefined,
-      category,
-      activityName,
-      description,
-      items,
-      grandTotal: calculateGrandTotal(),
-      timestamp: Date.now()
-    };
+    setIsSubmitting(true);
 
-    onAddTransaction(newTransaction);
-    setView('LIST');
-    resetForm();
+    try {
+      // Process items and upload files if present
+      const processedItems = await Promise.all(items.map(async (item) => {
+        let fileUrl = item.filePreviewUrl; // Default to existing object URL or undefined
+        if (item.file) {
+          const uploadedUrl = await uploadFile(item.file);
+          if (uploadedUrl) {
+            fileUrl = uploadedUrl; // Use relative path from server
+          }
+        }
+        // Return item without the raw File object to keep JSON clean
+        const { file, ...rest } = item;
+        return { ...rest, filePreviewUrl: fileUrl };
+      }));
+
+      const newTransaction: Transaction = {
+        id: generateId(),
+        date,
+        type,
+        expenseType: type === 'PENGELUARAN' ? expenseType : undefined,
+        category,
+        activityName,
+        description,
+        items: processedItems,
+        grandTotal: calculateGrandTotal(),
+        timestamp: Date.now()
+      };
+
+      onAddTransaction(newTransaction);
+      setView('LIST');
+      resetForm();
+    } catch (error) {
+      console.error("Gagal menyimpan transaksi:", error);
+      alert("Terjadi kesalahan saat menyimpan transaksi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -338,16 +382,18 @@ const Journal: React.FC<JournalProps> = ({
           <div className="flex justify-end gap-3 pt-6">
             <button 
               type="button"
+              disabled={isSubmitting}
               onClick={() => setView('LIST')}
-              className="px-6 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors"
+              className="px-6 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors disabled:opacity-50"
             >
               Batal
             </button>
             <button 
               type="submit"
-              className="px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium shadow-sm shadow-blue-200 dark:shadow-none transition-colors flex items-center gap-2"
+              disabled={isSubmitting}
+              className="px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium shadow-sm shadow-blue-200 dark:shadow-none transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <Save size={18} /> Simpan Transaksi
+              {isSubmitting ? 'Menyimpan...' : ( <><Save size={18} /> Simpan Transaksi</> )}
             </button>
           </div>
         </form>
@@ -394,7 +440,15 @@ const Journal: React.FC<JournalProps> = ({
                         {formatCurrency(t.grandTotal)}
                       </td>
                       <td className="px-6 py-4 text-center">
-                         {t.items.some(i => i.file) ? <FileText size={16} className="text-blue-500 mx-auto" /> : <span className="text-slate-300 dark:text-slate-600">-</span>}
+                         {t.items.some(i => i.filePreviewUrl) ? (
+                            <div className="flex justify-center gap-1">
+                                {t.items.filter(i => i.filePreviewUrl).map((i, idx) => (
+                                    <a key={idx} href={i.filePreviewUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 p-1" title={i.name}>
+                                        <FileText size={16} />
+                                    </a>
+                                ))}
+                            </div>
+                         ) : <span className="text-slate-300 dark:text-slate-600">-</span>}
                       </td>
                     </tr>
                   ))
