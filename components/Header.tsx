@@ -16,7 +16,11 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar }) =
         <button onClick={toggleSidebar} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">R</div>
+        <img 
+          src="https://ruangdimensirecords.com/img/logo.png" 
+          alt="RDR Finance" 
+          className="h-10 w-auto object-contain"
+        />
         <span className="font-bold text-lg text-slate-800 tracking-tight hidden md:block">KEUANGAN <span className="text-blue-600">RDR</span></span>
       </div>
 

@@ -106,11 +106,11 @@ const App: React.FC = () => {
       case 'STAT_EXPENSE': return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="EXPENSE" />;
       case 'ADD_EXPENSE': return <Journal onAddTransaction={handleAddTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} />;
       case 'REIMBURSE': return <ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onUpdateReimbursement={handleUpdateReimbursement} categories={appSettings.categories} />;
-      case 'REPORT_EXPENSE': return <Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" />;
+      case 'REPORT_EXPENSE': return <Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" categories={appSettings.categories} />;
       case 'ADD_INCOME': return <Journal onAddTransaction={handleAddTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} />;
       case 'STAT_INCOME': return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="INCOME" />;
       case 'JOURNAL_LIST': return <Journal onAddTransaction={handleAddTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} />;
-      case 'REPORT': return <Report transactions={transactions} reimbursements={reimbursements} />;
+      case 'REPORT': return <Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} />;
       case 'SETTINGS': return <Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} />;
       default: return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} />;
     }
@@ -144,14 +144,15 @@ const App: React.FC = () => {
         {/* Content Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-thin">
-                <div className="max-w-7xl mx-auto min-h-[calc(100vh-160px)]">
+                <div className="max-w-7xl mx-auto">
                     {renderContent()}
                 </div>
-                {/* Footer attached to bottom of scrollable content area if content is short, or scrolls with it */}
-                <div className="mt-8">
-                    <Footer />
-                </div>
             </main>
+            
+            {/* Footer Static at Bottom (Outside Main Scroll Area) */}
+            <div className="shrink-0 z-20">
+              <Footer />
+            </div>
         </div>
       </div>
 

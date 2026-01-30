@@ -8,9 +8,10 @@ interface ReportProps {
   transactions: Transaction[];
   reimbursements: Reimbursement[];
   fixedFilterType?: string; // If present, locks the filter dropdown
+  categories: string[]; // Added categories prop
 }
 
-const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilterType }) => {
+const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilterType, categories }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -61,7 +62,11 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
     if (startDate) data = data.filter(d => d.date >= startDate);
     if (endDate) data = data.filter(d => d.date <= endDate);
     if (filterType !== 'ALL') data = data.filter(d => d.type === filterType || (filterType === 'REIMBURSE' && d.subType === 'REIMBURSE'));
-    if (categoryFilter) data = data.filter(d => d.category.toLowerCase().includes(categoryFilter.toLowerCase()));
+    
+    // Updated Filter Logic for Exact Match via Dropdown
+    if (categoryFilter) {
+      data = data.filter(d => d.category === categoryFilter);
+    }
 
     return data.sort((a, b) => b.timestamp - a.timestamp);
   }, [transactions, reimbursements, startDate, endDate, filterType, categoryFilter]);
@@ -147,10 +152,19 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
         )}
 
         <div>
-           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">Cari Kategori</label>
+           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">Filter Kategori</label>
            <div className="relative">
              <Filter className="absolute left-2.5 top-2.5 text-slate-400" size={14}/>
-             <input type="text" placeholder="Filter Kategori..." value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full p-2 pl-8 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg text-sm outline-none focus:border-blue-500" />
+             <select 
+                value={categoryFilter} 
+                onChange={e => setCategoryFilter(e.target.value)} 
+                className="w-full p-2 pl-8 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg text-sm outline-none focus:border-blue-500 appearance-none"
+             >
+                <option value="">Semua Kategori</option>
+                {categories.map((cat, idx) => (
+                  <option key={idx} value={cat}>{cat}</option>
+                ))}
+             </select>
            </div>
         </div>
       </div>

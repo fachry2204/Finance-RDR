@@ -42,9 +42,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center font-bold text-3xl text-white mx-auto mb-4 shadow-lg shadow-blue-200">
-            R
-          </div>
+          <img 
+            src="https://ruangdimensirecords.com/img/logo.png" 
+            alt="RDR Logo" 
+            className="h-24 w-auto mx-auto mb-6 object-contain"
+          />
           <h1 className="text-2xl font-bold text-slate-800">Selamat Datang</h1>
           <p className="text-slate-500">Sistem Informasi Keuangan RDR</p>
         </div>
