@@ -378,7 +378,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
         </form>
       ) : (
         <>
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors">
             <table className="w-full text-left">
               <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -394,7 +394,11 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {reimbursements.length > 0 ? (
                   reimbursements.sort((a,b)=> b.timestamp - a.timestamp).map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors even:bg-slate-50 dark:even:bg-slate-800">
+                    <tr 
+                      key={r.id} 
+                      onClick={() => openDetail(r)}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors even:bg-slate-50 dark:even:bg-slate-800 cursor-pointer"
+                    >
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{formatDate(r.date)}</td>
                       <td className="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">{r.requestorName}</td>
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
@@ -410,7 +414,10 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button 
-                          onClick={() => openDetail(r)}
+                          onClick={(e) => {
+                             e.stopPropagation();
+                             openDetail(r);
+                          }}
                           className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 p-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg transition-colors"
                           title="Lihat Detail"
                         >
