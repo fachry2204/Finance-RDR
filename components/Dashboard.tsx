@@ -138,18 +138,18 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, reimbursements, isD
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">
-                  <th className="pb-3">Tanggal</th>
-                  <th className="pb-3">Kategori</th>
-                  <th className="pb-3 text-right">Nominal</th>
+                  <th className="pb-3 px-3">Tanggal</th>
+                  <th className="pb-3 px-3">Kategori</th>
+                  <th className="pb-3 px-3 text-right">Nominal</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {transactions
                   .filter(t => filterType === 'ALL' || (filterType === 'INCOME' && t.type === 'PEMASUKAN') || (filterType === 'EXPENSE' && t.type === 'PENGELUARAN'))
                   .slice(0, 5).map((t) => (
-                  <tr key={t.id} className="text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="py-3 text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
-                    <td className="py-3">
+                  <tr key={t.id} className="text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors even:bg-slate-50 dark:even:bg-slate-800">
+                    <td className="py-3 px-3 text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
+                    <td className="py-3 px-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                         t.type === 'PEMASUKAN' 
                           ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' 
@@ -158,7 +158,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, reimbursements, isD
                         {t.category}
                       </span>
                     </td>
-                    <td className={`py-3 text-right font-medium ${t.type === 'PEMASUKAN' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                    <td className={`py-3 px-3 text-right font-medium ${t.type === 'PEMASUKAN' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                       {t.type === 'PEMASUKAN' ? '+' : '-'} {formatCurrency(t.grandTotal)}
                     </td>
                   </tr>

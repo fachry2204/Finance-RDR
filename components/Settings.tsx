@@ -226,8 +226,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {users.map(u => (
-                                <tr key={u.id}>
+                            {users.map((u, index) => (
+                                <tr key={u.id} className="even:bg-slate-50">
                                     <td className="p-3 text-slate-800">{u.username}</td>
                                     <td className="p-3 text-slate-500 uppercase text-xs font-bold">{u.role}</td>
                                     <td className="p-3 text-right">

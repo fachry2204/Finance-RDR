@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, ExpenseType, ItemDetail } from '../types';
 import { generateId, formatCurrency, formatDate } from '../utils';
-import { Plus, Trash2, Save, UploadCloud, FileText } from 'lucide-react';
+import { Plus, Trash2, Save, UploadCloud, FileText, X, Calendar, Tag, File } from 'lucide-react';
 
 interface JournalProps {
   onAddTransaction: (transaction: Transaction) => void;
@@ -23,6 +23,7 @@ const Journal: React.FC<JournalProps> = ({
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>(initialView);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -398,71 +399,171 @@ const Journal: React.FC<JournalProps> = ({
           </div>
         </form>
       ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Tanggal</th>
-                  {!filterType && <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Jenis</th>}
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Kategori</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Kegiatan</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Item</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-right">Total</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-center">Bukti</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {filteredTransactions.length > 0 ? (
-                  filteredTransactions.sort((a,b) => b.timestamp - a.timestamp).map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
-                      {!filterType && (
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            t.type === 'PEMASUKAN' 
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' 
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
-                          }`}>
-                            {t.type}
-                          </span>
+        <>
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Tanggal</th>
+                    {!filterType && <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Jenis</th>}
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Kategori</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Kegiatan</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Item</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-right">Total</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-center">Bukti</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                  {filteredTransactions.length > 0 ? (
+                    filteredTransactions.sort((a,b) => b.timestamp - a.timestamp).map((t) => (
+                      <tr 
+                        key={t.id} 
+                        onClick={() => setSelectedTransaction(t)}
+                        className="hover:bg-blue-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer even:bg-slate-50 dark:even:bg-slate-800"
+                        title="Klik untuk melihat detail"
+                      >
+                        <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
+                        {!filterType && (
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              t.type === 'PEMASUKAN' 
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' 
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+                            }`}>
+                              {t.type}
+                            </span>
+                          </td>
+                        )}
+                        <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{t.category}</td>
+                        <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
+                          <div className="font-medium">{t.activityName}</div>
+                          <div className="text-xs text-slate-400 truncate max-w-[200px]">{t.description}</div>
                         </td>
-                      )}
-                      <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{t.category}</td>
-                      <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
-                        <div className="font-medium">{t.activityName}</div>
-                        <div className="text-xs text-slate-400 truncate max-w-[200px]">{t.description}</div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                        {t.items.length} Item
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-800 dark:text-slate-200 text-right">
-                        {formatCurrency(t.grandTotal)}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                         {t.items.some(i => i.filePreviewUrl) ? (
-                            <div className="flex justify-center gap-1">
-                                {t.items.filter(i => i.filePreviewUrl).map((i, idx) => (
-                                    <a key={idx} href={i.filePreviewUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 p-1" title={i.name}>
-                                        <FileText size={16} />
-                                    </a>
-                                ))}
-                            </div>
-                         ) : <span className="text-slate-300 dark:text-slate-600">-</span>}
+                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                          {t.items.length} Item
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-slate-800 dark:text-slate-200 text-right">
+                          {formatCurrency(t.grandTotal)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                           {t.items.some(i => i.filePreviewUrl) ? (
+                              <div className="flex justify-center gap-1">
+                                  {t.items.filter(i => i.filePreviewUrl).map((i, idx) => (
+                                      <div key={idx} className="text-blue-500 p-1" title={i.name}>
+                                          <FileText size={16} />
+                                      </div>
+                                  ))}
+                              </div>
+                           ) : <span className="text-slate-300 dark:text-slate-600">-</span>}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={filterType ? 6 : 7} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">
+                        Belum ada data {filterType ? filterType.toLowerCase() : 'jurnal'}
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={filterType ? 6 : 7} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">
-                      Belum ada data {filterType ? filterType.toLowerCase() : 'jurnal'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* DETAIL MODAL */}
+          {selectedTransaction && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-sm animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Detail Transaksi</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">ID: {selectedTransaction.id}</p>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setSelectedTransaction(null); }} 
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                  {/* Status Banner */}
+                  <div className={`p-4 rounded-lg flex items-center gap-3 border ${
+                    selectedTransaction.type === 'PEMASUKAN' 
+                      ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                      : 'bg-rose-50 border-rose-100 text-rose-800'
+                  }`}>
+                    {selectedTransaction.type === 'PEMASUKAN' ? <Plus size={24} /> : <Tag size={24} />}
+                    <div>
+                      <p className="text-xs font-bold uppercase opacity-70">Jenis Transaksi</p>
+                      <p className="font-bold text-lg">{selectedTransaction.type} {selectedTransaction.expenseType ? `(${selectedTransaction.expenseType})` : ''}</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                       <p className="text-xs font-bold uppercase opacity-70">Total Nilai</p>
+                       <p className="font-bold text-lg">{formatCurrency(selectedTransaction.grandTotal)}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-500 flex items-center gap-1 mb-1"><Calendar size={14}/> Tanggal</p>
+                      <p className="font-medium text-slate-800">{formatDate(selectedTransaction.date)}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 flex items-center gap-1 mb-1"><Tag size={14}/> Kategori</p>
+                      <p className="font-medium text-slate-800">{selectedTransaction.category}</p>
+                    </div>
+                    <div className="col-span-2">
+                       <p className="text-slate-500 mb-1">Nama Kegiatan</p>
+                       <p className="font-medium text-slate-800">{selectedTransaction.activityName}</p>
+                    </div>
+                     <div className="col-span-2">
+                       <p className="text-slate-500 mb-1">Keterangan</p>
+                       <p className="text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100">{selectedTransaction.description || '-'}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2"><FileText size={18}/> Detail Item</h4>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-500 font-medium">
+                          <tr>
+                            <th className="px-4 py-2">Item</th>
+                            <th className="px-4 py-2 text-center">Qty</th>
+                            <th className="px-4 py-2 text-right">Harga</th>
+                            <th className="px-4 py-2 text-right">Total</th>
+                            <th className="px-4 py-2 text-center">Bukti</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedTransaction.items.map((item, i) => (
+                            <tr key={i} className="even:bg-slate-50">
+                              <td className="px-4 py-2">{item.name}</td>
+                              <td className="px-4 py-2 text-center">{item.qty}</td>
+                              <td className="px-4 py-2 text-right">{formatCurrency(item.price)}</td>
+                              <td className="px-4 py-2 text-right font-medium">{formatCurrency(item.total)}</td>
+                              <td className="px-4 py-2 text-center">
+                                {item.filePreviewUrl ? (
+                                  <a href={item.filePreviewUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1">
+                                    <File size={14}/> Lihat
+                                  </a>
+                                ) : <span className="text-slate-300">-</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

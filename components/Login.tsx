@@ -48,6 +48,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden">
       
+      {/* Database Status Indicator - Top Right */}
+      <div className={`absolute top-4 right-4 z-10 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border shadow-sm transition-all duration-300 ${isDbConnected ? 'bg-white text-emerald-700 border-emerald-100' : 'bg-white text-rose-700 border-rose-100'}`}>
+        <div className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+        {isDbConnected ? 'Database Terhubung' : 'Database Offline'}
+      </div>
+
       {/* Database Disconnect Warning Modal */}
       {!isDbConnected && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm p-4 animate-fade-in">
@@ -78,11 +84,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
           />
           <h1 className="text-2xl font-bold text-slate-800">Selamat Datang</h1>
           <p className="text-slate-500">Sistem Informasi Keuangan RDR</p>
-          
-          <div className={`mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${isDbConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'}`}>
-            <div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-            {isDbConnected ? 'Database Terhubung' : 'Database Offline'}
-          </div>
         </div>
 
         {error && (

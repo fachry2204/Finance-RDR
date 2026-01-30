@@ -113,22 +113,65 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
     return 'Laporan Keuangan';
   }
 
+  // Helper for current datetime string
+  const getCurrentDateTime = () => {
+    return new Date().toLocaleString('id-ID', { 
+        dateStyle: 'full', 
+        timeStyle: 'medium' 
+    });
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <style>{`
+        @media print {
+          @page { margin: 1.5cm; }
+          body { 
+            background: white; 
+            color: black; 
+            font-size: 12px;
+          }
+          /* Hide non-printable areas */
+          .no-print, nav, header, footer, .sidebar, button, input, select, .summary-cards {
+            display: none !important;
+          }
+          /* Show print specific areas */
+          .print-header, .print-footer {
+            display: block !important;
+          }
+          /* Ensure table looks good */
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          thead { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; }
+          tr.even { background-color: #f9f9f9 !important; -webkit-print-color-adjust: exact; }
+          
+          /* Main container adjustment */
+          .main-content { margin: 0; padding: 0; overflow: visible; }
+        }
+        /* Default hide print areas */
+        .print-header, .print-footer { display: none; }
+      `}</style>
+
+      {/* PRINT HEADER */}
+      <div className="print-header mb-6 text-center border-b-2 border-slate-800 pb-4">
+          <h1 className="text-2xl font-bold uppercase tracking-wider text-slate-900">System Informasi Finance</h1>
+          <h2 className="text-xl font-semibold text-slate-700">Ruang Dimensi Records</h2>
+      </div>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{getPageTitle()}</h2>
         <div className="flex gap-2">
           <button onClick={handleExportCSV} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors">
             <Download size={18} /> Excel
           </button>
           <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-900 dark:hover:bg-slate-600 transition-colors">
-            <Printer size={18} /> PDF / Print
+            <Printer size={18} /> Print / PDF
           </button>
         </div>
       </div>
 
-      {/* Filter Section */}
-      <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-4 transition-colors">
+      {/* Filter Section - Hidden on Print */}
+      <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-4 transition-colors no-print">
         <div>
           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">Dari Tanggal</label>
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg text-sm outline-none focus:border-blue-500" />
@@ -169,8 +212,8 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Summary Cards - Hidden on Print based on prompt requirement */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 summary-cards no-print">
         {(!fixedFilterType || fixedFilterType === 'PEMASUKAN') && (
            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-800">
              <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold uppercase">Total Pemasukan</p>
@@ -218,8 +261,8 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
               {reportData.length > 0 ? (
-                reportData.map(d => (
-                  <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                reportData.map((d, index) => (
+                  <tr key={d.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${index % 2 === 0 ? 'even' : 'odd'}`}>
                     <td className="px-6 py-3 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDate(d.date)}</td>
                     <td className="px-6 py-3">
                       <div className="flex flex-col gap-1">
@@ -259,6 +302,11 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* PRINT FOOTER */}
+      <div className="print-footer mt-10 pt-4 border-t border-slate-400 text-right text-sm text-slate-600">
+         <p>Dicetak / Didownload Tanggal : {getCurrentDateTime()}</p>
       </div>
     </div>
   );

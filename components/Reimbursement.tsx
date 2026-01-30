@@ -328,7 +328,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {reimbursements.length > 0 ? (
                   reimbursements.sort((a,b)=> b.timestamp - a.timestamp).map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors even:bg-slate-50 dark:even:bg-slate-800">
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{formatDate(r.date)}</td>
                       <td className="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">{r.requestorName}</td>
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
@@ -432,7 +432,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700 bg-white dark:bg-slate-800">
                           {selectedReimb.items.map((item, idx) => (
-                            <tr key={idx}>
+                            <tr key={idx} className="even:bg-slate-50 dark:even:bg-slate-700">
                               <td className="px-4 py-2 text-slate-700 dark:text-slate-300">{item.name}</td>
                               <td className="px-4 py-2 text-center text-slate-600 dark:text-slate-400">{item.qty}</td>
                               <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-400">{formatCurrency(item.price)}</td>
