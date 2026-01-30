@@ -21,23 +21,13 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// --- SERVE STATIC FRONTEND ---
-// Karena build vite sekarang ada di folder 'public' di dalam folder server ini
-const publicPath = path.join(__dirname, 'public');
-
-if (fs.existsSync(publicPath)) {
-    console.log(`[INFO] Serving static files from: ${publicPath}`);
-    app.use(express.static(publicPath));
-} else {
-    console.warn(`[WARN] Folder public tidak ditemukan. Pastikan Anda sudah menjalankan 'npm run build'.`);
-}
-
 // --- DATABASE CONNECTION ---
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'keuangan_rdr'
+    database: process.env.DB_NAME || 'keuangan_rdr',
+    dateStrings: true // PENTING: Agar tanggal kembali sebagai string 'YYYY-MM-DD', bukan Date Object
 };
 
 let pool;
@@ -60,7 +50,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 const upload = multer({ dest: 'uploads/' });
 
-// --- API ROUTES ---
+// --- API ROUTES (DEFINED FIRST) ---
 
 app.get('/api/test-db', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -80,66 +70,71 @@ app.get('/api/test-db', async (req, res) => {
 // --- TRANSACTIONS API ---
 
 app.get('/api/transactions', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     try {
         const [rows] = await pool.query('SELECT * FROM transactions ORDER BY created_at DESC');
         
-        // Get items for each transaction
+        if (!rows || rows.length === 0) {
+            return res.json([]);
+        }
+
         const transactions = await Promise.all(rows.map(async (t) => {
             const [items] = await pool.query('SELECT * FROM transaction_items WHERE transaction_id = ?', [t.id]);
             return {
                 id: t.id,
-                date: t.date, // Format might need adjustment depending on DB
+                date: t.date, // Sekarang string bersih 'YYYY-MM-DD' karena dateStrings: true
                 type: t.type,
                 expenseType: t.expense_type,
                 category: t.category,
                 activityName: t.activity_name,
                 description: t.description,
-                grandTotal: parseFloat(t.grand_total),
-                items: items.map(i => ({
+                grandTotal: parseFloat(t.grand_total || 0),
+                items: (items || []).map(i => ({
                     id: i.id,
                     name: i.name,
                     qty: i.qty,
-                    price: parseFloat(i.price),
-                    total: parseFloat(i.total),
-                    filePreviewUrl: i.file_url // Simplify: serving url directly if needed
+                    price: parseFloat(i.price || 0),
+                    total: parseFloat(i.total || 0),
+                    filePreviewUrl: i.file_url 
                 })),
                 timestamp: new Date(t.created_at).getTime()
             };
         }));
         res.json(transactions);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error fetching transactions' });
+        console.error('Error fetching transactions:', error);
+        res.status(500).json({ message: 'Error fetching transactions', error: error.toString() });
     }
 });
 
 app.post('/api/transactions', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
         const t = req.body;
         
-        // Insert Transaction
         await conn.query(
             'INSERT INTO transactions (id, date, type, expense_type, category, activity_name, description, grand_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [t.id, t.date, t.type, t.expenseType || null, t.category, t.activityName, t.description, t.grandTotal]
         );
 
-        // Insert Items
-        for (const item of t.items) {
-             await conn.query(
-                'INSERT INTO transaction_items (id, transaction_id, name, qty, price, total) VALUES (?, ?, ?, ?, ?, ?)',
-                [item.id, t.id, item.name, item.qty, item.price, item.total]
-             );
+        if (t.items && t.items.length > 0) {
+            for (const item of t.items) {
+                 await conn.query(
+                    'INSERT INTO transaction_items (id, transaction_id, name, qty, price, total) VALUES (?, ?, ?, ?, ?, ?)',
+                    [item.id, t.id, item.name, item.qty, item.price, item.total]
+                 );
+            }
         }
 
         await conn.commit();
         res.json({ status: 'success', message: 'Transaction saved' });
     } catch (error) {
         await conn.rollback();
-        console.error(error);
+        console.error('Error saving transaction:', error);
         res.status(500).json({ message: 'Failed to save transaction', error: error.message });
     } finally {
         conn.release();
@@ -149,10 +144,15 @@ app.post('/api/transactions', async (req, res) => {
 // --- REIMBURSEMENTS API ---
 
 app.get('/api/reimbursements', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     try {
         const [rows] = await pool.query('SELECT * FROM reimbursements ORDER BY created_at DESC');
         
+        if (!rows || rows.length === 0) {
+            return res.json([]);
+        }
+
         const reimbursements = await Promise.all(rows.map(async (r) => {
             const [items] = await pool.query('SELECT * FROM reimbursement_items WHERE reimbursement_id = ?', [r.id]);
             return {
@@ -162,16 +162,16 @@ app.get('/api/reimbursements', async (req, res) => {
                 category: r.category,
                 activityName: r.activity_name,
                 description: r.description,
-                grandTotal: parseFloat(r.grand_total),
+                grandTotal: parseFloat(r.grand_total || 0),
                 status: r.status,
                 transferProofUrl: r.transfer_proof_url,
                 rejectionReason: r.rejection_reason,
-                items: items.map(i => ({
+                items: (items || []).map(i => ({
                     id: i.id,
                     name: i.name,
                     qty: i.qty,
-                    price: parseFloat(i.price),
-                    total: parseFloat(i.total),
+                    price: parseFloat(i.price || 0),
+                    total: parseFloat(i.total || 0),
                     filePreviewUrl: i.file_url
                 })),
                 timestamp: new Date(r.created_at).getTime()
@@ -179,12 +179,13 @@ app.get('/api/reimbursements', async (req, res) => {
         }));
         res.json(reimbursements);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error fetching reimbursements' });
+        console.error('Error fetching reimbursements:', error);
+        res.status(500).json({ message: 'Error fetching reimbursements', error: error.toString() });
     }
 });
 
 app.post('/api/reimbursements', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const conn = await pool.getConnection();
     try {
@@ -196,18 +197,20 @@ app.post('/api/reimbursements', async (req, res) => {
             [r.id, r.date, r.requestorName, r.category, r.activityName, r.description, r.grandTotal, 'PENDING']
         );
 
-        for (const item of r.items) {
-             await conn.query(
-                'INSERT INTO reimbursement_items (id, reimbursement_id, name, qty, price, total) VALUES (?, ?, ?, ?, ?, ?)',
-                [item.id, r.id, item.name, item.qty, item.price, item.total]
-             );
+        if (r.items && r.items.length > 0) {
+            for (const item of r.items) {
+                 await conn.query(
+                    'INSERT INTO reimbursement_items (id, reimbursement_id, name, qty, price, total) VALUES (?, ?, ?, ?, ?, ?)',
+                    [item.id, r.id, item.name, item.qty, item.price, item.total]
+                 );
+            }
         }
 
         await conn.commit();
         res.json({ status: 'success', message: 'Reimbursement saved' });
     } catch (error) {
         await conn.rollback();
-        console.error(error);
+        console.error('Error saving reimbursement:', error);
         res.status(500).json({ message: 'Failed to save reimbursement', error: error.message });
     } finally {
         conn.release();
@@ -215,6 +218,7 @@ app.post('/api/reimbursements', async (req, res) => {
 });
 
 app.put('/api/reimbursements/:id', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { id } = req.params;
     const { status, rejectionReason } = req.body;
@@ -226,13 +230,12 @@ app.put('/api/reimbursements/:id', async (req, res) => {
         );
         res.json({ status: 'success', message: 'Status updated' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to update status' });
+        console.error('Error updating reimbursement:', error);
+        res.status(500).json({ message: 'Failed to update status', error: error.message });
     }
 });
 
-// --- AUTH & DRIVE (Existing Code) ---
-
+// --- AUTH & DRIVE API ---
 app.get('/auth/google', (req, res) => {
     if (!oauth2Client) return res.status(500).json({ message: 'Google Client ID belum dikonfigurasi.' });
     const scopes = ['https://www.googleapis.com/auth/drive.file'];
@@ -287,8 +290,17 @@ app.post('/api/upload-drive', upload.single('file'), async (req, res) => {
     }
 });
 
-// --- CATCH ALL ROUTE (SPA HANDLER) ---
+// --- SERVE STATIC FRONTEND (AFTER API ROUTES) ---
+// Placing this after API routes ensures that if a route matches an API endpoint, it's handled by the API.
+// Only if it doesn't match an API will it look for a static file.
+const publicPath = path.join(__dirname, 'public');
+
 if (fs.existsSync(publicPath)) {
+    console.log(`[INFO] Serving static files from: ${publicPath}`);
+    app.use(express.static(publicPath));
+    
+    // --- CATCH ALL ROUTE (SPA HANDLER) ---
+    // This must be the very last route.
     app.get('*', (req, res) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/auth')) {
             return res.status(404).json({ message: 'API Endpoint Not Found' });

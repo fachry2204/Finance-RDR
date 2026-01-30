@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, ExpenseType, ItemDetail } from '../types';
-import { generateId, formatCurrency } from '../utils';
+import { generateId, formatCurrency, formatDate } from '../utils';
 import { Plus, Trash2, Save, UploadCloud, FileText } from 'lucide-react';
 
 interface JournalProps {
@@ -370,7 +370,7 @@ const Journal: React.FC<JournalProps> = ({
                 {filteredTransactions.length > 0 ? (
                   filteredTransactions.sort((a,b) => b.timestamp - a.timestamp).map((t) => (
                     <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{t.date}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
                       {!filterType && (
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

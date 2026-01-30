@@ -84,19 +84,35 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
 
+  // Fetch Helper with Better Error Handling
+  const safeFetchJson = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      const text = await response.text();
+      
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error(`Gagal parsing JSON dari ${url}. Response:`, text.substring(0, 200));
+        return null;
+      }
+    } catch (e) {
+      console.error(`Network error saat fetch ${url}:`, e);
+      return null;
+    }
+  };
+
   // Fetch Data on Load
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const txRes = await fetch('/api/transactions');
-        const txData = await txRes.json();
+        const txData = await safeFetchJson('/api/transactions');
         if (Array.isArray(txData)) setTransactions(txData);
 
-        const rmRes = await fetch('/api/reimbursements');
-        const rmData = await rmRes.json();
+        const rmData = await safeFetchJson('/api/reimbursements');
         if (Array.isArray(rmData)) setReimbursements(rmData);
       } catch (error) {
-        console.error("Gagal mengambil data:", error);
+        console.error("Critical error fetching data:", error);
       }
     };
     fetchData();
@@ -114,10 +130,12 @@ const App: React.FC = () => {
        });
        
        if (!res.ok) {
-         throw new Error('Gagal menyimpan ke server');
+         const errText = await res.text();
+         console.error("Server Error:", errText);
+         throw new Error('Gagal menyimpan ke server: ' + res.status);
        }
     } catch (error) {
-      alert("Gagal menyimpan transaksi ke database.");
+      alert("Gagal menyimpan transaksi ke database. Cek console untuk detail.");
       console.error(error);
     }
   };
@@ -131,10 +149,14 @@ const App: React.FC = () => {
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify(reimbursement)
       });
-      if (!res.ok) throw new Error('Gagal menyimpan reimburse');
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("Server Error:", errText);
+        throw new Error('Gagal menyimpan reimburse');
+      }
 
     } catch (error) {
-       alert("Gagal menyimpan reimburse ke database.");
+       alert("Gagal menyimpan reimburse ke database. Cek console untuk detail.");
        console.error(error);
     }
   };

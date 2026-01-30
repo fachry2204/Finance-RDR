@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     id VARCHAR(50) PRIMARY KEY,
     date DATE NOT NULL,
     type ENUM('PEMASUKAN', 'PENGELUARAN') NOT NULL,
-    expense_type ENUM('NORMAL', 'REIMBES'),
+    expense_type ENUM('NORMAL', 'REIMBURSE'),
     category VARCHAR(255),
     activity_name VARCHAR(255),
     description TEXT,

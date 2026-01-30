@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Transaction, Reimbursement } from '../types';
-import { formatCurrency } from '../utils';
+import { formatCurrency, formatDate } from '../utils';
 import { TrendingUp, TrendingDown, Wallet, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -148,7 +148,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, reimbursements, isD
                   .filter(t => filterType === 'ALL' || (filterType === 'INCOME' && t.type === 'PEMASUKAN') || (filterType === 'EXPENSE' && t.type === 'PENGELUARAN'))
                   .slice(0, 5).map((t) => (
                   <tr key={t.id} className="text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="py-3 text-slate-600 dark:text-slate-300">{t.date}</td>
+                    <td className="py-3 text-slate-600 dark:text-slate-300">{formatDate(t.date)}</td>
                     <td className="py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                         t.type === 'PEMASUKAN' 

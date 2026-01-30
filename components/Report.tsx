@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, Reimbursement } from '../types';
-import { formatCurrency } from '../utils';
+import { formatCurrency, formatDate } from '../utils';
 import { Download, Filter, Printer } from 'lucide-react';
 
 interface ReportProps {
@@ -206,7 +206,7 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
               {reportData.length > 0 ? (
                 reportData.map(d => (
                   <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="px-6 py-3 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{d.date}</td>
+                    <td className="px-6 py-3 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">{formatDate(d.date)}</td>
                     <td className="px-6 py-3">
                       <div className="flex flex-col gap-1">
                         <span className={`inline-flex w-fit items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${

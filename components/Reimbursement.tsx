@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Reimbursement, ItemDetail, ReimbursementStatus } from '../types';
-import { generateId, formatCurrency } from '../utils';
+import { generateId, formatCurrency, formatDate } from '../utils';
 import { Plus, Save, UploadCloud, Trash2, User, FileText, Eye, X, CheckCircle, XCircle, Clock, Loader, AlertCircle, Lock } from 'lucide-react';
 
 interface ReimbursementProps {
@@ -267,7 +267,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                 {reimbursements.length > 0 ? (
                   reimbursements.sort((a,b)=> b.timestamp - a.timestamp).map(r => (
                     <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{r.date}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{formatDate(r.date)}</td>
                       <td className="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">{r.requestorName}</td>
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                         <div>{r.activityName}</div>
@@ -341,7 +341,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Tanggal</p>
-                      <p className="font-medium text-slate-800 dark:text-white">{selectedReimb.date}</p>
+                      <p className="font-medium text-slate-800 dark:text-white">{formatDate(selectedReimb.date)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Kegiatan</p>
