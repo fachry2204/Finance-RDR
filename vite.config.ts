@@ -4,8 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Ensure relative paths for assets so it works in subfolders on Plesk
-  base: './', 
+  base: '/', 
   server: {
     proxy: {
       '/api': {
@@ -21,7 +20,8 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist',
+    // Build langsung ke dalam folder server/public
+    outDir: 'server/public',
     emptyOutDir: true,
   }
 })

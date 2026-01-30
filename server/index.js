@@ -21,16 +21,15 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// --- SERVE STATIC FRONTEND (PRODUCTION) ---
-// Mencari folder 'dist' (hasil build vite) di folder root (satu tingkat di atas folder server ini)
-const distPath = path.resolve(__dirname, '../dist');
+// --- SERVE STATIC FRONTEND ---
+// Karena build vite sekarang ada di folder 'public' di dalam folder server ini
+const publicPath = path.join(__dirname, 'public');
 
-// Jika folder dist ada, layani file statisnya (CSS, JS, Images)
-if (fs.existsSync(distPath)) {
-    console.log(`[INFO] Serving static files from: ${distPath}`);
-    app.use(express.static(distPath));
+if (fs.existsSync(publicPath)) {
+    console.log(`[INFO] Serving static files from: ${publicPath}`);
+    app.use(express.static(publicPath));
 } else {
-    console.warn(`[WARN] Folder build '../dist' tidak ditemukan. Pastikan Anda sudah menjalankan 'npm run build'.`);
+    console.warn(`[WARN] Folder public tidak ditemukan. Pastikan Anda sudah menjalankan 'npm run build'.`);
 }
 
 // --- DATABASE CONNECTION ---
@@ -57,19 +56,14 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         process.env.GOOGLE_CLIENT_SECRET,
         process.env.GOOGLE_REDIRECT_URI
     );
-} else {
-    console.warn('[WARN] Google OAuth Credentials belum diset di .env');
 }
 
 const upload = multer({ dest: 'uploads/' });
 
 // --- API ROUTES ---
 
-// 1. TEST DB CONNECTION
 app.get('/api/test-db', async (req, res) => {
-    // Set Header explicit JSON agar frontend tidak bingung
     res.setHeader('Content-Type', 'application/json');
-    
     if (!pool) return res.status(500).json({ status: 'error', message: 'Pool database belum terinisialisasi' });
     
     try {
@@ -83,23 +77,15 @@ app.get('/api/test-db', async (req, res) => {
     }
 });
 
-// 2. GOOGLE AUTH START
 app.get('/auth/google', (req, res) => {
-    if (!oauth2Client) return res.status(500).json({ message: 'Google Client ID/Secret belum dikonfigurasi.' });
-
+    if (!oauth2Client) return res.status(500).json({ message: 'Google Client ID belum dikonfigurasi.' });
     const scopes = ['https://www.googleapis.com/auth/drive.file'];
-    const url = oauth2Client.generateAuthUrl({
-        access_type: 'offline',
-        scope: scopes,
-        prompt: 'consent'
-    });
+    const url = oauth2Client.generateAuthUrl({ access_type: 'offline', scope: scopes, prompt: 'consent' });
     res.json({ url });
 });
 
-// 3. GOOGLE AUTH CALLBACK
 app.get('/auth/google/callback', async (req, res) => {
     if (!oauth2Client) return res.status(500).send('OAuth Client not configured');
-    
     const { code } = req.query;
     try {
         const { tokens } = await oauth2Client.getToken(code);
@@ -107,7 +93,7 @@ app.get('/auth/google/callback', async (req, res) => {
         fs.writeFileSync('tokens.json', JSON.stringify(tokens));
         res.redirect('/settings?status=drive_connected');
     } catch (error) {
-        console.error('Error retrieving access token', error);
+        console.error(error);
         res.redirect('/settings?status=drive_failed');
     }
 });
@@ -122,68 +108,39 @@ const loadTokens = () => {
     return false;
 };
 
-// 4. UPLOAD TO DRIVE
 app.post('/api/upload-drive', upload.single('file'), async (req, res) => {
-    if (!loadTokens()) {
-        return res.status(401).json({ message: 'Google Drive belum terhubung.' });
-    }
-
+    if (!loadTokens()) return res.status(401).json({ message: 'Google Drive belum terhubung.' });
     const { folderId } = req.body;
     const file = req.file;
-
     if (!file) return res.status(400).json({ message: 'No file uploaded' });
 
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
-
     try {
         const fileMetadata = {
             name: file.originalname,
             parents: folderId && folderId !== 'root' ? [folderId] : []
         };
-        const media = {
-            mimeType: file.mimetype,
-            body: fs.createReadStream(file.path)
-        };
-
+        const media = { mimeType: file.mimetype, body: fs.createReadStream(file.path) };
         const response = await drive.files.create({
-            requestBody: fileMetadata,
-            media: media,
-            fields: 'id, webViewLink, webContentLink'
+            requestBody: fileMetadata, media: media, fields: 'id, webViewLink'
         });
-
         fs.unlinkSync(file.path);
-
-        res.json({
-            status: 'success',
-            fileId: response.data.id,
-            url: response.data.webViewLink
-        });
+        res.json({ status: 'success', fileId: response.data.id, url: response.data.webViewLink });
     } catch (error) {
-        console.error('Drive Upload Error:', error);
-        res.status(500).json({ message: 'Upload ke Drive gagal', error: error.message });
+        res.status(500).json({ message: 'Upload gagal', error: error.message });
     }
 });
 
-// --- CATCH ALL ROUTE (HANDLE REACT ROUTER) ---
-// Route ini harus diletakkan PALING BAWAH, setelah semua route API.
-// Fungsinya: Jika request bukan ke /api, maka kembalikan file index.html milik React.
-if (fs.existsSync(distPath)) {
+// --- CATCH ALL ROUTE (SPA HANDLER) ---
+if (fs.existsSync(publicPath)) {
     app.get('*', (req, res) => {
-        // Jangan intercept request API yang salah ketik (biarkan 404 json)
         if (req.path.startsWith('/api') || req.path.startsWith('/auth')) {
             return res.status(404).json({ message: 'API Endpoint Not Found' });
         }
-        res.sendFile(path.join(distPath, 'index.html'));
+        res.sendFile(path.join(publicPath, 'index.html'));
     });
 } else {
-    // Fallback jika belum di-build
-    app.get('/', (req, res) => {
-        res.send(`
-            <h1>Backend Server Berjalan</h1>
-            <p>Namun folder <code>dist</code> (Frontend) tidak ditemukan.</p>
-            <p>Silakan jalankan <code>npm run build</code> di root project Anda, lalu restart server.</p>
-        `);
-    });
+    app.get('/', (req, res) => res.send('Server Running. Please run npm run build inside root directory.'));
 }
 
 app.listen(PORT, () => {
