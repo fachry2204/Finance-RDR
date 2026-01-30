@@ -24,6 +24,8 @@ export interface Transaction {
   timestamp: number; // For sorting
 }
 
+export type ReimbursementStatus = 'PENDING' | 'PROSES' | 'BERHASIL' | 'DITOLAK';
+
 export interface Reimbursement {
   id: string;
   date: string;
@@ -33,8 +35,46 @@ export interface Reimbursement {
   description: string;
   items: ItemDetail[];
   grandTotal: number;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: ReimbursementStatus;
+  transferProof?: File | null; // Bukti Transfer admin
+  transferProofUrl?: string;
+  rejectionReason?: string; // Alasan penolakan jika status DITOLAK
   timestamp: number;
 }
 
-export type PageView = 'DASHBOARD' | 'JOURNAL' | 'REIMBES' | 'REPORT';
+export type PageView = 
+  | 'DASHBOARD' 
+  | 'ADD_EXPENSE' 
+  | 'REIMBES' 
+  | 'STAT_EXPENSE' 
+  | 'REPORT_EXPENSE' 
+  | 'ADD_INCOME' 
+  | 'STAT_INCOME' 
+  | 'JOURNAL_LIST' 
+  | 'REPORT'
+  | 'SETTINGS'; // New Page
+
+// --- NEW CONFIGURATION TYPES ---
+
+export interface DatabaseConfig {
+  host: string;
+  user: string;
+  password: string;
+  name: string;
+  port: string;
+  isConnected: boolean;
+}
+
+export interface GoogleDriveConfig {
+  isConnected: boolean;
+  selectedFolderId: string;
+  selectedFolderName: string;
+  autoUpload: boolean;
+  email?: string;
+}
+
+export interface AppSettings {
+  categories: string[];
+  database: DatabaseConfig;
+  drive: GoogleDriveConfig;
+}

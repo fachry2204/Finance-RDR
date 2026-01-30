@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BookOpen, Receipt, FileText, Menu, X, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Receipt, FileText, X, Sun, Moon, PlusCircle, PieChart, Wallet, CreditCard, List, Settings as SettingsIcon } from 'lucide-react';
 import { PageView } from '../types';
 
 interface SidebarProps {
@@ -12,11 +12,38 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isOpen, setIsOpen, theme, toggleTheme }) => {
-  const menuItems = [
-    { id: 'DASHBOARD' as PageView, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'JOURNAL' as PageView, label: 'Jurnal Finance', icon: BookOpen },
-    { id: 'REIMBES' as PageView, label: 'Sistem Reimbes', icon: Receipt },
-    { id: 'REPORT' as PageView, label: 'Laporan', icon: FileText },
+  
+  const menuGroups = [
+    {
+      title: 'Menu Utama',
+      items: [
+        { id: 'DASHBOARD' as PageView, label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'JOURNAL_LIST' as PageView, label: 'Semua Jurnal', icon: List },
+        { id: 'REPORT' as PageView, label: 'Laporan Umum', icon: FileText },
+      ]
+    },
+    {
+      title: 'Pengeluaran',
+      items: [
+        { id: 'STAT_EXPENSE' as PageView, label: 'Dashboard Cash Out', icon: PieChart },
+        { id: 'ADD_EXPENSE' as PageView, label: 'Add Pengeluaran', icon: PlusCircle },
+        { id: 'REIMBES' as PageView, label: 'Sistem Reimbes', icon: Receipt },
+        { id: 'REPORT_EXPENSE' as PageView, label: 'Laporan Pengeluaran', icon: FileText },
+      ]
+    },
+    {
+      title: 'Pemasukan',
+      items: [
+        { id: 'ADD_INCOME' as PageView, label: 'Add Pemasukan', icon: Wallet },
+        { id: 'STAT_INCOME' as PageView, label: 'Statistik Pemasukan', icon: PieChart },
+      ]
+    },
+    {
+      title: 'Lainnya',
+      items: [
+        { id: 'SETTINGS' as PageView, label: 'Pengaturan', icon: SettingsIcon },
+      ]
+    }
   ];
 
   return (
@@ -30,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isOpen, se
       )}
 
       {/* Sidebar Container */}
-      <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 dark:bg-slate-950 text-white transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 dark:bg-slate-950 text-white transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
         <div className="flex items-center justify-between p-6 border-b border-slate-700 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-xl text-white">R</div>
@@ -41,31 +68,40 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isOpen, se
           </button>
         </div>
 
-        <nav className="mt-8 px-4 space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activePage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActivePage(item.id);
-                  setIsOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${
-                  isActive 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
-                    : 'text-slate-400 hover:bg-slate-800 dark:hover:bg-slate-900 hover:text-white'
-                }`}
-              >
-                <Icon size={20} />
-                <span className="font-medium">{item.label}</span>
-              </button>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-6">
+          {menuGroups.map((group, groupIndex) => (
+            <div key={groupIndex}>
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
+                {group.title}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activePage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActivePage(item.id);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm ${
+                        isActive 
+                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
+                          : 'text-slate-400 hover:bg-slate-800 dark:hover:bg-slate-900 hover:text-white'
+                      }`}
+                    >
+                      <Icon size={18} />
+                      <span className="font-medium">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-slate-700 dark:border-slate-800">
+        <div className="p-6 border-t border-slate-700 dark:border-slate-800 mt-auto">
           {/* Theme Toggle */}
           <div className="flex items-center justify-between mb-6 bg-slate-800 dark:bg-slate-900 p-1.5 rounded-lg">
             <button

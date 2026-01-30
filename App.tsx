@@ -4,7 +4,8 @@ import Dashboard from './components/Dashboard';
 import Journal from './components/Journal';
 import ReimbursementPage from './components/Reimbursement';
 import Report from './components/Report';
-import { Transaction, Reimbursement, PageView } from './types';
+import Settings from './components/Settings';
+import { Transaction, Reimbursement, PageView, AppSettings } from './types';
 import { Menu } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -33,6 +34,60 @@ const App: React.FC = () => {
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
+  // --- APP SETTINGS STATE (Categories, DB, Drive) ---
+  const [appSettings, setAppSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('appSettings');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    // Default Settings
+    return {
+      categories: [
+        'Operasional', 
+        'Transportasi', 
+        'Makan & Minum', 
+        'ATK', 
+        'Marketing', 
+        'Gaji', 
+        'Maintenance',
+        'Project Alpha'
+      ],
+      database: {
+        host: '',
+        user: '',
+        password: '',
+        name: '',
+        port: '3306',
+        isConnected: false
+      },
+      drive: {
+        isConnected: false,
+        selectedFolderId: '',
+        selectedFolderName: '',
+        autoUpload: false
+      }
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('appSettings', JSON.stringify(appSettings));
+  }, [appSettings]);
+
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setAppSettings(newSettings);
+  };
+
+  // Legacy Handlers for specific category updates (kept for compatibility if needed, but Settings component handles bulk)
+  const handleAddCategory = (newCat: string) => {
+    if (!appSettings.categories.includes(newCat)) {
+      setAppSettings(prev => ({ ...prev, categories: [...prev.categories, newCat] }));
+    }
+  };
+
+  const handleDeleteCategory = (catToDelete: string) => {
+    setAppSettings(prev => ({ ...prev, categories: prev.categories.filter(c => c !== catToDelete) }));
   };
 
   // Global State (Simulating Database)
@@ -67,7 +122,7 @@ const App: React.FC = () => {
       id: 'rm-001',
       date: '2023-10-27',
       requestorName: 'Budi Santoso',
-      category: 'Transport',
+      category: 'Transportasi',
       activityName: 'Meeting Client',
       description: 'Grab ke kantor client',
       items: [{ id: '3', name: 'Grab Car', qty: 1, price: 75000, total: 75000 }],
@@ -79,22 +134,55 @@ const App: React.FC = () => {
 
   const handleAddTransaction = (transaction: Transaction) => {
     setTransactions([...transactions, transaction]);
+    // SIMULATION: If DB connected, this would POST to API
+    if (appSettings.database.isConnected) {
+      console.log("Simulating Save to MySQL:", transaction);
+    }
+    // SIMULATION: If Drive connected, this would Upload Files
+    if (appSettings.drive.isConnected && appSettings.drive.autoUpload) {
+      console.log("Simulating Upload to Drive Folder:", appSettings.drive.selectedFolderName);
+    }
   };
 
   const handleAddReimbursement = (reimbursement: Reimbursement) => {
     setReimbursements([...reimbursements, reimbursement]);
   };
 
+  const handleUpdateReimbursement = (updatedReimb: Reimbursement) => {
+    setReimbursements(prev => prev.map(r => r.id === updatedReimb.id ? updatedReimb : r));
+  };
+
   const renderContent = () => {
     switch (activePage) {
       case 'DASHBOARD':
-        return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={theme === 'dark'} />;
-      case 'JOURNAL':
-        return <Journal onAddTransaction={handleAddTransaction} transactions={transactions} />;
+        return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={theme === 'dark'} filterType="ALL" />;
+      
+      // Expense Category Views
+      case 'STAT_EXPENSE':
+        return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={theme === 'dark'} filterType="EXPENSE" />;
+      case 'ADD_EXPENSE':
+        return <Journal onAddTransaction={handleAddTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} />;
       case 'REIMBES':
-        return <ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} />;
+        return <ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onUpdateReimbursement={handleUpdateReimbursement} categories={appSettings.categories} />;
+      case 'REPORT_EXPENSE':
+        return <Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" />;
+      
+      // Income Category Views
+      case 'ADD_INCOME':
+        return <Journal onAddTransaction={handleAddTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} />;
+      case 'STAT_INCOME':
+        return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={theme === 'dark'} filterType="INCOME" />;
+      
+      // General Views
+      case 'JOURNAL_LIST':
+        return <Journal onAddTransaction={handleAddTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} />;
       case 'REPORT':
         return <Report transactions={transactions} reimbursements={reimbursements} />;
+      
+      // Settings
+      case 'SETTINGS':
+        return <Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} />;
+        
       default:
         return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={theme === 'dark'} />;
     }

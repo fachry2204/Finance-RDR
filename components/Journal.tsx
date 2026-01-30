@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType, ExpenseType, ItemDetail } from '../types';
 import { generateId, formatCurrency } from '../utils';
 import { Plus, Trash2, Save, UploadCloud, FileText } from 'lucide-react';
@@ -6,19 +6,45 @@ import { Plus, Trash2, Save, UploadCloud, FileText } from 'lucide-react';
 interface JournalProps {
   onAddTransaction: (transaction: Transaction) => void;
   transactions: Transaction[];
+  defaultType?: TransactionType;
+  filterType?: TransactionType; // New prop to filter list view
+  initialView?: 'LIST' | 'FORM';
+  categories: string[]; // List of categories for dropdown
 }
 
-const Journal: React.FC<JournalProps> = ({ onAddTransaction, transactions }) => {
-  const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
+const Journal: React.FC<JournalProps> = ({ 
+  onAddTransaction, 
+  transactions, 
+  defaultType = 'PENGELUARAN',
+  filterType,
+  initialView = 'LIST',
+  categories
+}) => {
+  const [view, setView] = useState<'LIST' | 'FORM'>(initialView);
   
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [type, setType] = useState<TransactionType>('PENGELUARAN');
+  const [type, setType] = useState<TransactionType>(defaultType);
   const [expenseType, setExpenseType] = useState<ExpenseType>('NORMAL');
   const [category, setCategory] = useState('');
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
   const [items, setItems] = useState<ItemDetail[]>([]);
+
+  // Update state when props change
+  useEffect(() => {
+    setView(initialView);
+    setType(defaultType);
+    if (defaultType === 'PENGELUARAN') {
+      setExpenseType('NORMAL');
+    }
+  }, [initialView, defaultType]);
+
+  // Filter transactions for the list view
+  const filteredTransactions = useMemo(() => {
+    if (!filterType) return transactions;
+    return transactions.filter(t => t.type === filterType);
+  }, [transactions, filterType]);
 
   // Add Item
   const addItem = () => {
@@ -95,24 +121,42 @@ const Journal: React.FC<JournalProps> = ({ onAddTransaction, transactions }) => 
     setItems([]);
   };
 
+  const getTitle = () => {
+     if (view === 'FORM') {
+        return type === 'PEMASUKAN' ? 'Tambah Pemasukan' : 'Tambah Pengeluaran';
+     }
+     if (filterType === 'PENGELUARAN') return 'Data Pengeluaran';
+     if (filterType === 'PEMASUKAN') return 'Data Pemasukan';
+     return 'Daftar Jurnal Transaksi';
+  }
+
+  const getButtonLabel = () => {
+    if (filterType === 'PENGELUARAN') return '+ Tambah Pengeluaran';
+    if (filterType === 'PEMASUKAN') return '+ Tambah Pemasukan';
+    return '+ Tambah Transaksi';
+  }
+
+  // Check if we are in specific mode (via filterType) to hide general dropdowns in form
+  const isSpecificMode = !!filterType;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Jurnal Finance</h2>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{getTitle()}</h2>
         {view === 'LIST' ? (
           <button 
             onClick={() => setView('FORM')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm font-medium"
           >
-            <Plus size={18} /> Tambah Transaksi
+            {getButtonLabel()}
           </button>
         ) : (
-           <button 
-            onClick={() => setView('LIST')}
-            className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg transition-colors"
-          >
-            Kembali
-          </button>
+             <button 
+              onClick={() => setView('LIST')}
+              className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg transition-colors font-medium"
+            >
+              Kembali
+            </button>
         )}
       </div>
 
@@ -130,40 +174,50 @@ const Journal: React.FC<JournalProps> = ({ onAddTransaction, transactions }) => 
                 className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Jenis Transaksi</label>
-              <select 
-                value={type} 
-                onChange={(e) => setType(e.target.value as TransactionType)}
-                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
-              >
-                <option value="PEMASUKAN">Pemasukan</option>
-                <option value="PENGELUARAN">Pengeluaran</option>
-              </select>
-            </div>
-            {type === 'PENGELUARAN' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Jenis Pengeluaran</label>
-                <select 
-                  value={expenseType} 
-                  onChange={(e) => setExpenseType(e.target.value as ExpenseType)}
-                  className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
-                >
-                  <option value="NORMAL">Normal</option>
-                  <option value="REIMBES">Reimbes</option>
-                </select>
-              </div>
+
+            {/* Hide dropdowns if in specific ADD mode */}
+            {!isSpecificMode && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Jenis Transaksi</label>
+                  <select 
+                    value={type} 
+                    onChange={(e) => setType(e.target.value as TransactionType)}
+                    className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                  >
+                    <option value="PEMASUKAN">Pemasukan</option>
+                    <option value="PENGELUARAN">Pengeluaran</option>
+                  </select>
+                </div>
+                {type === 'PENGELUARAN' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Jenis Pengeluaran</label>
+                    <select 
+                      value={expenseType} 
+                      onChange={(e) => setExpenseType(e.target.value as ExpenseType)}
+                      className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                    >
+                      <option value="NORMAL">Normal</option>
+                      <option value="REIMBES">Reimbes</option>
+                    </select>
+                  </div>
+                )}
+              </>
             )}
+
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Kategori Kegiatan</label>
-              <input 
-                type="text" 
+              <select 
                 required
-                placeholder="Contoh: Operasional"
                 value={category} 
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
-              />
+              >
+                <option value="" disabled>Pilih Kategori</option>
+                {categories.map((cat, idx) => (
+                  <option key={idx} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nama Kegiatan</label>
@@ -303,7 +357,7 @@ const Journal: React.FC<JournalProps> = ({ onAddTransaction, transactions }) => 
               <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Tanggal</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Jenis</th>
+                  {!filterType && <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Jenis</th>}
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Kategori</th>
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Kegiatan</th>
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Item</th>
@@ -312,24 +366,21 @@ const Journal: React.FC<JournalProps> = ({ onAddTransaction, transactions }) => 
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                {transactions.length > 0 ? (
-                  transactions.sort((a,b) => b.timestamp - a.timestamp).map((t) => (
+                {filteredTransactions.length > 0 ? (
+                  filteredTransactions.sort((a,b) => b.timestamp - a.timestamp).map((t) => (
                     <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">{t.date}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          t.type === 'PEMASUKAN' 
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' 
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
-                        }`}>
-                          {t.type}
-                        </span>
-                        {t.expenseType === 'REIMBES' && (
-                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                            REIMBES
+                      {!filterType && (
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            t.type === 'PEMASUKAN' 
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' 
+                              : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+                          }`}>
+                            {t.type}
                           </span>
-                        )}
-                      </td>
+                        </td>
+                      )}
                       <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{t.category}</td>
                       <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
                         <div className="font-medium">{t.activityName}</div>
@@ -348,8 +399,8 @@ const Journal: React.FC<JournalProps> = ({ onAddTransaction, transactions }) => 
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">
-                      Belum ada data jurnal
+                    <td colSpan={filterType ? 6 : 7} className="px-6 py-10 text-center text-slate-400 dark:text-slate-500">
+                      Belum ada data {filterType ? filterType.toLowerCase() : 'jurnal'}
                     </td>
                   </tr>
                 )}
