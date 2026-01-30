@@ -79,17 +79,6 @@ const App: React.FC = () => {
     setAppSettings(newSettings);
   };
 
-  // Legacy Handlers for specific category updates (kept for compatibility if needed, but Settings component handles bulk)
-  const handleAddCategory = (newCat: string) => {
-    if (!appSettings.categories.includes(newCat)) {
-      setAppSettings(prev => ({ ...prev, categories: [...prev.categories, newCat] }));
-    }
-  };
-
-  const handleDeleteCategory = (catToDelete: string) => {
-    setAppSettings(prev => ({ ...prev, categories: prev.categories.filter(c => c !== catToDelete) }));
-  };
-
   // Global State (Simulating Database)
   const [transactions, setTransactions] = useState<Transaction[]>([
     {
@@ -181,7 +170,7 @@ const App: React.FC = () => {
       
       // Settings
       case 'SETTINGS':
-        return <Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} />;
+        return <Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} />;
         
       default:
         return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={theme === 'dark'} />;

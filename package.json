@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server:install": "cd server && npm install",
+    "server:start": "cd server && node index.js",
+    "server:dev": "cd server && npm run dev"
   },
   "dependencies": {
     "lucide-react": "^0.292.0",
