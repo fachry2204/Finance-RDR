@@ -21,6 +21,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [userLoading, setUserLoading] = useState(false);
+  const [categoryLoading, setCategoryLoading] = useState(false);
   
   const [isTestingDB, setIsTestingDB] = useState(false);
   const [dbMessage, setDbMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
@@ -46,18 +47,65 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
   }
 
   // --- Category Handlers ---
-  const handleAddCategory = (e: React.FormEvent) => {
+  const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newCategory.trim() && !settings.categories.includes(newCategory.trim())) {
-      onUpdateSettings({
-        ...settings,
-        categories: [...settings.categories, newCategory.trim()]
-      });
-      setNewCategory('');
+    const catName = newCategory.trim();
+    if (!catName || settings.categories.includes(catName)) return;
+
+    if (authToken) {
+       setCategoryLoading(true);
+       try {
+          const res = await fetch('/api/categories', {
+              method: 'POST',
+              headers: { 
+                 'Content-Type': 'application/json',
+                 'Authorization': `Bearer ${authToken}` 
+              },
+              body: JSON.stringify({ name: catName })
+          });
+          const data = await res.json();
+          if (!data.success) {
+             alert(data.message || 'Gagal menambahkan kategori ke server');
+             // Don't return here, maybe still update local if backend failed? 
+             // Ideally we should stop. But let's stop to be safe.
+             setCategoryLoading(false);
+             return;
+          }
+       } catch (err) {
+          alert('Gagal menghubungi server');
+          setCategoryLoading(false);
+          return;
+       }
+       setCategoryLoading(false);
     }
+
+    onUpdateSettings({
+      ...settings,
+      categories: [...settings.categories, catName]
+    });
+    setNewCategory('');
   };
 
-  const handleDeleteCategory = (cat: string) => {
+  const handleDeleteCategory = async (cat: string) => {
+    if (!confirm(`Hapus kategori "${cat}"?`)) return;
+
+    if (authToken) {
+        try {
+            const res = await fetch(`/api/categories/${encodeURIComponent(cat)}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert("Gagal menghapus kategori di server");
+                return;
+            }
+        } catch (e) {
+            alert("Gagal menghubungi server");
+            return;
+        }
+    }
+
     onUpdateSettings({
       ...settings,
       categories: settings.categories.filter(c => c !== cat)
@@ -184,13 +232,14 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="flex-1 rounded-lg border-slate-300 bg-slate-50 text-slate-900 border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                  disabled={categoryLoading}
                 />
                 <button 
                   type="submit"
-                  disabled={!newCategory.trim()}
+                  disabled={!newCategory.trim() || categoryLoading}
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-medium"
                 >
-                  <Plus size={18} /> Tambah
+                  {categoryLoading ? <RefreshCw size={18} className="animate-spin" /> : <Plus size={18} />} Tambah
                 </button>
               </form>
 

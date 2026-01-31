@@ -252,6 +252,42 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// --- CATEGORIES API ---
+app.get('/api/categories', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    try {
+        const [rows] = await pool.query('SELECT name FROM categories ORDER BY name ASC');
+        res.json(rows.map(r => r.name));
+    } catch (error) {
+        console.error('[API ERROR] Fetch categories failed:', error);
+        res.status(500).json({ message: 'Failed to fetch categories' });
+    }
+});
+
+app.post('/api/categories', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    const { name } = req.body;
+    try {
+        await pool.query('INSERT INTO categories (name) VALUES (?)', [name]);
+        res.json({ success: true, message: 'Category added' });
+    } catch (error) {
+        console.error('[API ERROR] Add category failed:', error);
+        res.status(500).json({ success: false, message: 'Failed to add category' });
+    }
+});
+
+app.delete('/api/categories/:name', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    const { name } = req.params;
+    try {
+        await pool.query('DELETE FROM categories WHERE name = ?', [name]);
+        res.json({ success: true, message: 'Category deleted' });
+    } catch (error) {
+        console.error('[API ERROR] Delete category failed:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete category' });
+    }
+});
+
 // --- USERS API (Admin Only) ---
 app.get('/api/users', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });

@@ -144,6 +144,12 @@ const App: React.FC = () => {
         if (Array.isArray(txData)) setTransactions(txData);
         const rmData = await safeFetchJson('/api/reimbursements');
         if (Array.isArray(rmData)) setReimbursements(rmData);
+        
+        // Fetch Categories from DB to sync
+        const catData = await safeFetchJson('/api/categories');
+        if (Array.isArray(catData) && catData.length > 0) {
+            setAppSettings(prev => ({ ...prev, categories: catData }));
+        }
         };
         fetchData();
     }
