@@ -23,22 +23,77 @@ const JWT_SECRET = process.env.JWT_SECRET || 'rdr-finance-secret-key-change-in-p
 app.use(cors());
 app.use(express.json());
 
-// --- DATABASE CONNECTION ---
+// --- DATABASE CONNECTION CONFIGURATION ---
+// Menggunakan 127.0.0.1 sebagai default untuk menghindari masalah resolusi DNS localhost di Node.js v17+
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '127.0.0.1', 
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'keuangan_rdr',
-    dateStrings: true 
+    port: process.env.DB_PORT || 3306,
+    dateStrings: true,
+    multipleStatements: true // Diperlukan untuk menjalankan schema.sql sekaligus
 };
 
 let pool;
-try {
-    pool = mysql.createPool(dbConfig);
-    console.log('Database configuration loaded.');
-} catch (err) {
-    console.error('Database configuration error:', err);
-}
+
+// --- INITIALIZE DATABASE FUNCTION ---
+const initDatabase = async () => {
+    try {
+        console.log(`[INIT] Menghubungkan ke MySQL Server di ${dbConfig.host}...`);
+        
+        // 1. Buat koneksi sementara tanpa memilih database untuk membuat DB jika belum ada
+        const connection = await mysql.createConnection({
+            host: dbConfig.host,
+            user: dbConfig.user,
+            password: dbConfig.password,
+            port: dbConfig.port
+        });
+
+        // 2. Buat Database
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\``);
+        await connection.end();
+
+        // 3. Inisialisasi Pool dengan Database yang sudah pasti ada
+        pool = mysql.createPool(dbConfig);
+        console.log(`[SUCCESS] Terhubung ke database: ${dbConfig.database}`);
+
+        // 4. Jalankan Schema (Buat Tabel dan Data Awal)
+        const schemaPath = path.join(__dirname, 'schema.sql');
+        if (fs.existsSync(schemaPath)) {
+            const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+            const conn = await pool.getConnection();
+            
+            // Memecah query berdasarkan titik koma untuk eksekusi yang lebih aman
+            const queries = schemaSql.split(';').filter(q => q.trim().length > 0);
+            
+            for (const query of queries) {
+                // Skip query kosong
+                if (!query.trim()) continue;
+                await conn.query(query);
+            }
+            
+            conn.release();
+            console.log('[SUCCESS] Struktur tabel berhasil disinkronisasi.');
+        } else {
+            console.warn('[WARN] File schema.sql tidak ditemukan. Melewati pembuatan tabel.');
+        }
+
+    } catch (err) {
+        console.error('\n===================================================');
+        console.error('[FATAL] GAGAL MENGHUBUNGKAN DATABASE');
+        console.error('Pesan Error:', err.message);
+        console.error('---------------------------------------------------');
+        console.error('TIPS PERBAIKAN:');
+        console.error('1. Pastikan XAMPP / MySQL Server sudah DIJALANKAN (Start).');
+        console.error('2. Cek username/password di file .env (Default: root tanpa password).');
+        console.error('3. Jika error "ECONNREFUSED", pastikan port MySQL adalah 3306.');
+        console.error('===================================================\n');
+    }
+};
+
+// Jalankan inisialisasi database saat server start
+initDatabase();
 
 // Helper: Hash Password (SHA256)
 const hashPassword = (password) => {
@@ -88,7 +143,7 @@ const upload = multer({ storage: storage });
 // Public Route (Health Check)
 app.get('/api/test-db', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
-    if (!pool) return res.status(500).json({ status: 'error', message: 'Pool database belum terinisialisasi' });
+    if (!pool) return res.status(500).json({ status: 'error', message: 'Database belum siap. Cek terminal server.' });
     
     try {
         const connection = await pool.getConnection();
@@ -97,7 +152,7 @@ app.get('/api/test-db', async (req, res) => {
         res.json({ status: 'success', message: 'Terhubung ke MySQL Database!' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 'error', message: 'Gagal terhubung ke Database.', error: error.message });
+        res.status(500).json({ status: 'error', message: 'Gagal ping database.', error: error.message });
     }
 });
 
@@ -173,11 +228,10 @@ app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => 
     res.json({ status: 'success', url: fileUrl });
 });
 
-// --- DASHBOARD SUMMARY API (NEW: Performance Optimization) ---
+// --- DASHBOARD SUMMARY API ---
 app.get('/api/dashboard-summary', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     try {
-        // Query Agregasi SQL (Much faster than processing in JS)
         const [incomeRows] = await pool.query("SELECT SUM(grand_total) as total FROM transactions WHERE type = 'PEMASUKAN'");
         const [expenseRows] = await pool.query("SELECT SUM(grand_total) as total FROM transactions WHERE type = 'PENGELUARAN'");
         const [reimbursePendingRows] = await pool.query("SELECT SUM(grand_total) as total FROM reimbursements WHERE status = 'PENDING'");
@@ -198,17 +252,16 @@ app.get('/api/dashboard-summary', authenticateToken, async (req, res) => {
     }
 });
 
-// --- TRANSACTIONS API (Updated with Pagination) ---
+// --- TRANSACTIONS API ---
 app.get('/api/transactions', authenticateToken, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 1000; // Default high for backward compatibility if UI isn't paginated yet
+    const limit = parseInt(req.query.limit) || 1000;
     const offset = (page - 1) * limit;
 
     try {
-        // Fetch Main Data with Pagination
         const [rows] = await pool.query('SELECT * FROM transactions ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
         
         if (!rows || rows.length === 0) {
@@ -321,7 +374,7 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// --- REIMBURSEMENTS API (Updated with Pagination) ---
+// --- REIMBURSEMENTS API ---
 app.get('/api/reimbursements', authenticateToken, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
