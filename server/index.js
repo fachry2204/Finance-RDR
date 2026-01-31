@@ -23,27 +23,105 @@ const JWT_SECRET = process.env.JWT_SECRET || 'rdr-secret-key-change-in-prod-999'
 app.use(cors());
 app.use(express.json());
 
-// --- DATABASE CONNECTION ---
+// --- DATABASE CONNECTION CONFIGURATION ---
+// PENTING: Gunakan 127.0.0.1, bukan localhost untuk menghindari isu IPv6 di Node.js
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '127.0.0.1',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'rdr_admin', // Updated to rdr_admin
-    dateStrings: true 
+    database: process.env.DB_NAME || 'rdr_admin',
+    port: process.env.DB_PORT || 3306,
+    dateStrings: true,
+    multipleStatements: true // Penting untuk menjalankan schema.sql
 };
 
 let pool;
-try {
-    pool = mysql.createPool(dbConfig);
-    console.log('Database configuration loaded.');
-} catch (err) {
-    console.error('Database configuration error:', err);
-}
 
 // Helper: Hash Password (SHA256)
 const hashPassword = (password) => {
     return crypto.createHash('sha256').update(password).digest('hex');
 };
+
+// --- INITIALIZE DATABASE AUTOMATICALLY ---
+const initDatabase = async () => {
+    try {
+        console.log(`[INIT] Mencoba menghubungkan ke MySQL di ${dbConfig.host}...`);
+
+        // 1. Koneksi awal TANPA database untuk mengecek/membuat DB
+        const connection = await mysql.createConnection({
+            host: dbConfig.host,
+            user: dbConfig.user,
+            password: dbConfig.password,
+            port: dbConfig.port
+        });
+
+        // 2. Buat Database jika belum ada
+        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\``);
+        console.log(`[SUCCESS] Database '${dbConfig.database}' siap/tersedia.`);
+        await connection.end();
+
+        // 3. Buat Pool Koneksi ke Database yang sudah pasti ada
+        pool = mysql.createPool(dbConfig);
+
+        // 4. Jalankan Schema (Buat Tabel Otomatis)
+        const schemaPath = path.join(__dirname, 'schema.sql');
+        if (fs.existsSync(schemaPath)) {
+            const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+            const conn = await pool.getConnection();
+            
+            // Split query berdasarkan ';' untuk eksekusi satu per satu (lebih aman)
+            const queries = schemaSql.split(';').filter(q => q.trim().length > 0);
+            
+            for (const query of queries) {
+                if (!query.trim()) continue;
+                try {
+                    await conn.query(query);
+                } catch (err) {
+                    // Abaikan error jika tabel sudah ada
+                    if (!err.message.includes("already exists") && !err.message.includes("Duplicate entry")) {
+                        console.warn("[WARN] Gagal eksekusi query schema:", err.message);
+                    }
+                }
+            }
+            conn.release();
+            console.log('[SUCCESS] Tabel database berhasil disinkronisasi.');
+        } else {
+            console.warn('[WARN] File schema.sql tidak ditemukan.');
+        }
+
+        // 5. Pastikan User Admin Ada (Fallback jika schema.sql gagal seed)
+        await ensureAdminUser();
+
+    } catch (err) {
+        console.error('\n===================================================');
+        console.error('[FATAL] KONEKSI DATABASE GAGAL');
+        console.error('Error:', err.message);
+        console.error('---------------------------------------------------');
+        console.error('Solusi:');
+        console.error('1. Pastikan XAMPP (MySQL) sudah di-START.');
+        console.error('2. Pastikan password di file .env benar (kosongkan jika default XAMPP).');
+        console.error('3. Pastikan port MySQL adalah 3306.');
+        console.error('===================================================\n');
+    }
+};
+
+const ensureAdminUser = async () => {
+    if (!pool) return;
+    try {
+        const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', ['admin']);
+        if (rows.length === 0) {
+            console.log('[INFO] User admin tidak ditemukan. Membuat user admin default...');
+            const hashedPassword = hashPassword('admin');
+            await pool.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', ['admin', hashedPassword, 'admin']);
+            console.log('[SUCCESS] User admin berhasil dibuat (Pass: admin).');
+        }
+    } catch (error) {
+        console.error('[WARN] Gagal mengecek/membuat user admin:', error.message);
+    }
+};
+
+// Jalankan inisialisasi
+initDatabase();
 
 // Middleware: Authenticate Token
 const authenticateToken = (req, res, next) => {
@@ -103,8 +181,10 @@ app.get('/api/test-db', async (req, res) => {
 
 // Login Route (Generates Token)
 app.post('/api/login', async (req, res) => {
-    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    if (!pool) return res.status(500).json({ success: false, message: 'DB not connected' });
     const { username, password } = req.body;
+
+    console.log(`[LOGIN ATTEMPT] User: ${username}`);
     
     try {
         const hashedPassword = hashPassword(password);
@@ -113,12 +193,15 @@ app.post('/api/login', async (req, res) => {
         if (rows.length > 0) {
             const user = rows[0];
             const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+            console.log(`[LOGIN SUCCESS] User: ${username}`);
             res.json({ success: true, user: user, token: token });
         } else {
+            console.log(`[LOGIN FAILED] Invalid credentials for: ${username}`);
             res.status(401).json({ success: false, message: 'Username atau password salah' });
         }
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error(`[LOGIN ERROR]`, error);
+        res.status(500).json({ success: false, message: 'Server error: ' + error.message });
     }
 });
 
