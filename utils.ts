@@ -10,6 +10,27 @@ export const formatCurrency = (amount: number): string => {
 
 export const formatDate = (dateString: string): string => {
   if (!dateString) return '-';
+  
+  // Mengantisipasi format YYYY-MM-DD dari database/input date
+  // Kita split manual agar tidak terkena pergeseran Timezone browser (GMT+7 dsb)
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+      const year = parts[0];
+      const monthIndex = parseInt(parts[1]) - 1;
+      const day = parts[2];
+
+      const months = [
+          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+
+      // Jika monthIndex valid
+      if (months[monthIndex]) {
+          return `${day} ${months[monthIndex]} ${year}`;
+      }
+  }
+
+  // Fallback jika format string berbeda (misal timestamp ISO lengkap)
   const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
   return new Date(dateString).toLocaleDateString('id-ID', options);
 };
