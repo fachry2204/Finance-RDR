@@ -661,18 +661,30 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
             </div>
           )}
 
-          {/* IMAGE PREVIEW MODAL */}
+          {/* IMAGE PREVIEW MODAL WITH ERROR HANDLING */}
           {previewImage && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-90 backdrop-blur-sm animate-fade-in" onClick={() => setPreviewImage(null)}>
               <button className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors" onClick={() => setPreviewImage(null)}>
                 <X size={32} />
               </button>
-              <img 
-                src={previewImage} 
-                alt="Preview" 
-                className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" 
-                onClick={(e) => e.stopPropagation()} 
-              />
+              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                 <img 
+                  src={previewImage} 
+                  alt="Bukti Reimburse" 
+                  className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain bg-white"
+                  onError={(e) => {
+                     const target = e.target as HTMLImageElement;
+                     target.onerror = null;
+                     target.style.display = 'none';
+                     target.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <div className="hidden flex flex-col items-center justify-center p-10 bg-white rounded-lg shadow-xl text-slate-500 min-w-[300px] min-h-[200px]">
+                    <AlertCircle size={48} className="text-rose-400 mb-3" />
+                    <p className="font-medium text-lg text-slate-700">Gambar Tidak Ditemukan</p>
+                    <p className="text-sm mt-1">File mungkin telah dihapus atau path salah.</p>
+                </div>
+              </div>
             </div>
           )}
         </>

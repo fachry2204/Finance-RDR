@@ -44,15 +44,22 @@ const hashPassword = (password) => {
 };
 
 // --- FILE UPLOAD STORAGE CONFIGURATION ---
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log(`[INFO] Created uploads directory at ${uploadDir}`);
+}
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         // Simpan di folder uploads (sejajar dengan public, bukan di dalamnya)
         // Agar tidak terhapus saat build frontend
-        const uploadDir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
+        const targetDir = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
         }
-        cb(null, uploadDir);
+        cb(null, targetDir);
     },
     filename: (req, file, cb) => {
         // Generate unique filename: timestamp-random.ext
@@ -312,6 +319,7 @@ app.put('/api/reimbursements/:id', async (req, res) => {
 // --- SERVE STATIC FRONTEND & UPLOADS ---
 
 // 1. Serve Uploads (Explicit Route for Persistence)
+// Serve uploads folder. __dirname refers to 'server' folder.
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 2. Serve Frontend
