@@ -8,6 +8,8 @@ interface ReimbursementProps {
   reimbursements: Reimbursement[];
   onAddReimbursement: (reimb: Reimbursement) => void;
   onUpdateReimbursement: (reimb: Reimbursement) => void;
+  onDeleteReimbursement: (id: string) => void;
+  onUpdateReimbursementDetails: (reimb: Reimbursement) => void; // For content edit
   categories: string[];
 }
 
@@ -15,11 +17,16 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   reimbursements, 
   onAddReimbursement, 
   onUpdateReimbursement,
+  onDeleteReimbursement,
+  onUpdateReimbursementDetails,
   categories 
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   const [selectedReimb, setSelectedReimb] = useState<Reimbursement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit Mode State
+  const [editingReimbId, setEditingReimbId] = useState<string | null>(null);
 
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -138,8 +145,8 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
         return { ...rest, filePreviewUrl: fileUrl };
       }));
 
-      const newReimb: Reimbursement = {
-        id: generateId(),
+      const reimbData: Reimbursement = {
+        id: editingReimbId || generateId(),
         date,
         requestorName,
         category,
@@ -147,25 +154,63 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
         description,
         items: processedItems,
         grandTotal: calculateTotal(),
-        status: 'PENDING',
+        status: 'PENDING', // Editing usually resets or keeps status? For simplicity, we keep it pending if new, or preserve existing if edit
         timestamp: Date.now()
       };
 
-      onAddReimbursement(newReimb);
+      if (editingReimbId) {
+          onUpdateReimbursementDetails(reimbData);
+          alert("Data reimburse berhasil diperbarui");
+      } else {
+          onAddReimbursement(reimbData);
+      }
+
       setView('LIST');
-      
-      // Reset
-      setRequestorName('');
-      setCategory('');
-      setActivityName('');
-      setDescription('');
-      setItems([]);
-      setEditingItemId(null);
+      resetForm();
     } catch (error) {
       console.error("Gagal menyimpan reimburse:", error);
       alert("Terjadi kesalahan.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setEditingReimbId(null);
+    setDate(new Date().toISOString().split('T')[0]);
+    setRequestorName('');
+    setCategory('');
+    setActivityName('');
+    setDescription('');
+    setItems([]);
+    setEditingItemId(null);
+  };
+
+  // --- EDIT & DELETE HANDLERS ---
+  const handleEdit = (e: React.MouseEvent, r: Reimbursement) => {
+    e.stopPropagation();
+    if (r.status !== 'PENDING') {
+        alert("Hanya pengajuan berstatus PENDING yang dapat diedit.");
+        return;
+    }
+    setEditingReimbId(r.id);
+    setDate(r.date);
+    setRequestorName(r.requestorName);
+    setCategory(r.category);
+    setActivityName(r.activityName);
+    setDescription(r.description);
+    setItems(r.items.map(i => ({...i})));
+    setView('FORM');
+  };
+
+  const handleDelete = (e: React.MouseEvent, r: Reimbursement) => {
+    e.stopPropagation();
+    if (r.status !== 'PENDING') {
+        alert("Hanya pengajuan berstatus PENDING yang dapat dihapus.");
+        return;
+    }
+    if (window.confirm("Yakin ingin menghapus pengajuan reimburse ini?")) {
+        onDeleteReimbursement(r.id);
     }
   };
 
@@ -188,7 +233,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
     }
   };
 
-  // Handle Update Status Logic
+  // Handle Update Status Logic (Admin Action)
   const openDetail = (r: Reimbursement) => {
     setSelectedReimb(r);
     setTempStatus(r.status);
@@ -246,13 +291,13 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Tambah Reimburse</h2>
         {view === 'LIST' ? (
           <button 
-            onClick={() => setView('FORM')}
+            onClick={() => { resetForm(); setView('FORM'); }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm font-medium"
           >
             <Plus size={18} /> Ajukan Reimburse
           </button>
         ) : (
-          <button onClick={() => setView('LIST')} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors font-medium">Kembali</button>
+          <button onClick={() => { resetForm(); setView('LIST'); }} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors font-medium">Kembali</button>
         )}
       </div>
 
@@ -396,9 +441,9 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
           </div>
 
           <div className="flex justify-end gap-3">
-            <button type="button" disabled={isSubmitting} onClick={() => setView('LIST')} className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">Batal</button>
+            <button type="button" disabled={isSubmitting} onClick={() => { resetForm(); setView('LIST'); }} className="px-6 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50">Batal</button>
             <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm shadow-blue-200 dark:shadow-none transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
-                {isSubmitting ? 'Memproses...' : <><Save size={18}/> Simpan Pengajuan</>}
+                {isSubmitting ? 'Memproses...' : <><Save size={18}/> {editingReimbId ? 'Update Pengajuan' : 'Simpan Pengajuan'}</>}
             </button>
           </div>
         </form>
@@ -439,16 +484,37 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button 
-                          onClick={(e) => {
-                             e.stopPropagation();
-                             openDetail(r);
-                          }}
-                          className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 p-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg transition-colors"
-                          title="Lihat Detail"
-                        >
-                          <Eye size={18} />
-                        </button>
+                        <div className="flex justify-center gap-2">
+                           <button 
+                             onClick={(e) => {
+                                e.stopPropagation();
+                                openDetail(r);
+                             }}
+                             className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 p-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg transition-colors"
+                             title="Lihat Detail"
+                           >
+                             <Eye size={18} />
+                           </button>
+                           {/* Allow Edit/Delete only if Status is PENDING */}
+                           {r.status === 'PENDING' && (
+                             <>
+                               <button 
+                                 onClick={(e) => handleEdit(e, r)}
+                                 className="text-slate-500 hover:text-blue-600 p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                                 title="Edit"
+                               >
+                                 <Pencil size={18} />
+                               </button>
+                               <button 
+                                 onClick={(e) => handleDelete(e, r)}
+                                 className="text-slate-500 hover:text-rose-600 p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                 title="Hapus"
+                               >
+                                 <Trash2 size={18} />
+                               </button>
+                             </>
+                           )}
+                        </div>
                       </td>
                     </tr>
                   ))

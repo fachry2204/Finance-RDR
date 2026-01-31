@@ -6,6 +6,8 @@ import { Plus, Trash2, Save, UploadCloud, FileText, X, Calendar, Tag, File, Penc
 
 interface JournalProps {
   onAddTransaction: (transaction: Transaction) => void;
+  onUpdateTransaction: (transaction: Transaction) => void;
+  onDeleteTransaction: (id: string) => void;
   transactions: Transaction[];
   defaultType?: TransactionType;
   filterType?: TransactionType; // New prop to filter list view
@@ -15,6 +17,8 @@ interface JournalProps {
 
 const Journal: React.FC<JournalProps> = ({ 
   onAddTransaction, 
+  onUpdateTransaction,
+  onDeleteTransaction,
   transactions, 
   defaultType = 'PENGELUARAN',
   filterType,
@@ -25,6 +29,9 @@ const Journal: React.FC<JournalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   
+  // Edit Mode State
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState<TransactionType>(defaultType);
@@ -135,16 +142,13 @@ const Journal: React.FC<JournalProps> = ({
     e.preventDefault();
     
     // --- AUTOSAVE LOGIC ---
-    // Jika masih ada item yang diedit, kita cek apakah valid
     if (editingItemId) {
        const itemBeingEdited = items.find(i => i.id === editingItemId);
        if (itemBeingEdited) {
-          // Jika nama kosong atau qty 0, baru kita block
           if (!itemBeingEdited.name.trim() || itemBeingEdited.qty <= 0) {
              alert("Mohon lengkapi Nama Item dan Qty pada baris yang sedang diedit.");
              return;
           }
-          // Jika valid, kita biarkan lanjut (otomatis dianggap save)
        }
     }
     
@@ -170,8 +174,8 @@ const Journal: React.FC<JournalProps> = ({
         return { ...rest, filePreviewUrl: fileUrl };
       }));
 
-      const newTransaction: Transaction = {
-        id: generateId(),
+      const transactionData: Transaction = {
+        id: editingTransactionId || generateId(),
         date,
         type,
         expenseType: type === 'PENGELUARAN' ? expenseType : undefined,
@@ -183,7 +187,13 @@ const Journal: React.FC<JournalProps> = ({
         timestamp: Date.now()
       };
 
-      onAddTransaction(newTransaction);
+      if (editingTransactionId) {
+        onUpdateTransaction(transactionData);
+        alert("Transaksi berhasil diperbarui");
+      } else {
+        onAddTransaction(transactionData);
+      }
+
       setView('LIST');
       resetForm();
     } catch (error) {
@@ -201,10 +211,33 @@ const Journal: React.FC<JournalProps> = ({
     setDescription('');
     setItems([]);
     setEditingItemId(null);
+    setEditingTransactionId(null);
+  };
+
+  // --- EDIT & DELETE HANDLERS ---
+  const handleEdit = (e: React.MouseEvent, t: Transaction) => {
+      e.stopPropagation();
+      setEditingTransactionId(t.id);
+      setDate(t.date);
+      setType(t.type);
+      setExpenseType(t.expenseType || 'NORMAL');
+      setCategory(t.category);
+      setActivityName(t.activityName);
+      setDescription(t.description);
+      setItems(t.items.map(i => ({...i}))); // Clone items
+      setView('FORM');
+  };
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (window.confirm("Apakah Anda yakin ingin menghapus transaksi ini? Data yang dihapus tidak dapat dikembalikan.")) {
+          onDeleteTransaction(id);
+      }
   };
 
   const getTitle = () => {
      if (view === 'FORM') {
+        if (editingTransactionId) return 'Edit Transaksi';
         return type === 'PEMASUKAN' ? 'Tambah Pemasukan' : 'Tambah Pengeluaran';
      }
      if (filterType === 'PENGELUARAN') return 'Data Pengeluaran';
@@ -227,14 +260,14 @@ const Journal: React.FC<JournalProps> = ({
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{getTitle()}</h2>
         {view === 'LIST' ? (
           <button 
-            onClick={() => setView('FORM')}
+            onClick={() => { resetForm(); setView('FORM'); }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm font-medium"
           >
             {getButtonLabel()}
           </button>
         ) : (
              <button 
-              onClick={() => setView('LIST')}
+              onClick={() => { resetForm(); setView('LIST'); }}
               className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg transition-colors font-medium"
             >
               Kembali
@@ -257,8 +290,8 @@ const Journal: React.FC<JournalProps> = ({
               />
             </div>
 
-            {/* Hide dropdowns if in specific ADD mode */}
-            {!isSpecificMode && (
+            {/* Hide dropdowns if in specific ADD mode AND NOT editing */}
+            {(!isSpecificMode || editingTransactionId) && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Jenis Transaksi</label>
@@ -475,7 +508,7 @@ const Journal: React.FC<JournalProps> = ({
             <button 
               type="button"
               disabled={isSubmitting}
-              onClick={() => setView('LIST')}
+              onClick={() => { resetForm(); setView('LIST'); }}
               className="px-6 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors disabled:opacity-50"
             >
               Batal
@@ -485,7 +518,7 @@ const Journal: React.FC<JournalProps> = ({
               disabled={isSubmitting}
               className="px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium shadow-sm shadow-blue-200 dark:shadow-none transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Menyimpan...' : ( <><Save size={18} /> Simpan Transaksi</> )}
+              {isSubmitting ? 'Menyimpan...' : ( <><Save size={18} /> {editingTransactionId ? 'Update Transaksi' : 'Simpan Transaksi'}</> )}
             </button>
           </div>
         </form>
@@ -502,7 +535,7 @@ const Journal: React.FC<JournalProps> = ({
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Kegiatan</th>
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Item</th>
                     <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-right">Total</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-center">Bukti</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -538,24 +571,22 @@ const Journal: React.FC<JournalProps> = ({
                           {formatCurrency(t.grandTotal)}
                         </td>
                         <td className="px-6 py-4 text-center">
-                           {t.items.some(i => i.filePreviewUrl) ? (
-                              <div className="flex justify-center gap-1">
-                                  {t.items.filter(i => i.filePreviewUrl).map((i, idx) => (
-                                      <button 
-                                        key={idx} 
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setPreviewImage(i.filePreviewUrl || null);
-                                        }}
-                                        className="text-blue-500 p-1 hover:text-blue-700" 
-                                        title={i.name}
-                                      >
-                                          <FileText size={16} />
-                                      </button>
-                                  ))}
-                              </div>
-                           ) : <span className="text-slate-300 dark:text-slate-600">-</span>}
+                            <div className="flex justify-center gap-2">
+                                <button 
+                                  onClick={(e) => handleEdit(e, t)}
+                                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil size={16} />
+                                </button>
+                                <button 
+                                  onClick={(e) => handleDelete(e, t.id)}
+                                  className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                  title="Hapus"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                            </div>
                         </td>
                       </tr>
                     ))
