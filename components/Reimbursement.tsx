@@ -9,9 +9,8 @@ interface ReimbursementProps {
   onAddReimbursement: (reimb: Reimbursement) => void;
   onUpdateReimbursement: (reimb: Reimbursement) => void;
   onDeleteReimbursement: (id: string) => void;
-  onUpdateReimbursementDetails: (reimb: Reimbursement) => void; 
+  onUpdateReimbursementDetails: (reimb: Reimbursement) => void; // For content edit
   categories: string[];
-  authToken: string | null;
 }
 
 const ReimbursementPage: React.FC<ReimbursementProps> = ({ 
@@ -20,8 +19,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   onUpdateReimbursement,
   onDeleteReimbursement,
   onUpdateReimbursementDetails,
-  categories,
-  authToken 
+  categories 
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   const [selectedReimb, setSelectedReimb] = useState<Reimbursement | null>(null);
@@ -94,18 +92,11 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   const calculateTotal = () => items.reduce((sum, i) => sum + i.total, 0);
 
   const uploadFile = async (file: File): Promise<string> => {
-    if (!authToken) {
-      alert("Sesi habis. Silakan login ulang.");
-      return '';
-    }
     const formData = new FormData();
     formData.append('file', file);
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-           'Authorization': `Bearer ${authToken}`
-        },
         body: formData
       });
       const data = await res.json();
@@ -163,7 +154,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
         description,
         items: processedItems,
         grandTotal: calculateTotal(),
-        status: 'PENDING', 
+        status: 'PENDING', // Editing usually resets or keeps status? For simplicity, we keep it pending if new, or preserve existing if edit
         timestamp: Date.now()
       };
 

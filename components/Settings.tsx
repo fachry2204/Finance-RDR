@@ -6,10 +6,9 @@ import { AppSettings, DatabaseConfig, User } from '../types';
 interface SettingsProps {
   settings: AppSettings;
   onUpdateSettings: (newSettings: AppSettings) => void;
-  authToken: string | null;
 }
 
-const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authToken }) => {
+const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings }) => {
   const [activeTab, setActiveTab] = useState<'GENERAL' | 'DATABASE' | 'USERS'>('GENERAL');
   
   // Local state
@@ -27,17 +26,14 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
 
   useEffect(() => {
     // Fetch users when tab becomes active
-    if (activeTab === 'USERS' && authToken) {
+    if (activeTab === 'USERS') {
         fetchUsers();
     }
-  }, [activeTab, authToken]);
+  }, [activeTab]);
 
   const fetchUsers = async () => {
-      if (!authToken) return;
       try {
-          const res = await fetch('/api/users', {
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
+          const res = await fetch('/api/users');
           const data = await res.json();
           if (Array.isArray(data)) setUsers(data);
       } catch (e) {
@@ -68,16 +64,12 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
   const handleAddUser = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newUsername.trim() || !newPassword.trim()) return;
-      if (!authToken) return alert("Sesi habis");
-
+      
       setUserLoading(true);
       try {
           const res = await fetch('/api/users', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-              },
+              headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({ username: newUsername, password: newPassword })
           });
           const data = await res.json();
@@ -98,12 +90,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
 
   const handleDeleteUser = async (id: number) => {
       if(!confirm("Yakin ingin menghapus user ini?")) return;
-      if (!authToken) return alert("Sesi habis");
       try {
-          const res = await fetch(`/api/users/${id}`, { 
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${authToken}` }
-          });
+          const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
           const data = await res.json();
           if(data.success) fetchUsers();
       } catch(e) {
@@ -116,7 +104,6 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
     setIsTestingDB(true);
     setDbMessage(null);
     try {
-      // Test DB route is public, but we can secure it if needed. Leaving public for diagnostics.
       const response = await fetch('/api/test-db');
       const data = await response.json();
       if (data.status === 'success') {
