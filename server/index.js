@@ -13,121 +13,51 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'rdr-finance-secret-key-change-in-production';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// --- DATABASE CONNECTION CONFIGURATION ---
-// Menggunakan 127.0.0.1 sebagai default untuk menghindari masalah resolusi DNS localhost di Node.js v17+
+// --- DATABASE CONNECTION ---
 const dbConfig = {
-    host: process.env.DB_HOST || '127.0.0.1', 
+    host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'rdr_admin', // Updated database name
-    port: process.env.DB_PORT || 3306,
-    dateStrings: true,
-    multipleStatements: true // Diperlukan untuk menjalankan schema.sql sekaligus
+    database: process.env.DB_NAME || 'keuangan_rdr',
+    dateStrings: true 
 };
 
 let pool;
-
-// --- INITIALIZE DATABASE FUNCTION ---
-const initDatabase = async () => {
-    try {
-        console.log(`[INIT] Menghubungkan ke MySQL Server di ${dbConfig.host}...`);
-        
-        // 1. Buat koneksi sementara tanpa memilih database untuk membuat DB jika belum ada
-        const connection = await mysql.createConnection({
-            host: dbConfig.host,
-            user: dbConfig.user,
-            password: dbConfig.password,
-            port: dbConfig.port
-        });
-
-        // 2. Buat Database
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\``);
-        await connection.end();
-
-        // 3. Inisialisasi Pool dengan Database yang sudah pasti ada
-        pool = mysql.createPool(dbConfig);
-        console.log(`[SUCCESS] Terhubung ke database: ${dbConfig.database}`);
-
-        // 4. Jalankan Schema (Buat Tabel dan Data Awal)
-        const schemaPath = path.join(__dirname, 'schema.sql');
-        if (fs.existsSync(schemaPath)) {
-            const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-            const conn = await pool.getConnection();
-            
-            // Memecah query berdasarkan titik koma untuk eksekusi yang lebih aman
-            const queries = schemaSql.split(';').filter(q => q.trim().length > 0);
-            
-            for (const query of queries) {
-                // Skip query kosong
-                if (!query.trim()) continue;
-                await conn.query(query);
-            }
-            
-            conn.release();
-            console.log('[SUCCESS] Struktur tabel berhasil disinkronisasi.');
-        } else {
-            console.warn('[WARN] File schema.sql tidak ditemukan. Melewati pembuatan tabel.');
-        }
-
-    } catch (err) {
-        console.error('\n===================================================');
-        console.error('[FATAL] GAGAL MENGHUBUNGKAN DATABASE');
-        console.error('Pesan Error:', err.message);
-        console.error('---------------------------------------------------');
-        console.error('TIPS PERBAIKAN:');
-        console.error('1. Pastikan XAMPP / MySQL Server sudah DIJALANKAN (Start).');
-        console.error('2. Cek username/password di file .env (Default: root tanpa password).');
-        console.error('3. Jika error "ECONNREFUSED", pastikan port MySQL adalah 3306.');
-        console.error('===================================================\n');
-    }
-};
-
-// Jalankan inisialisasi database saat server start
-initDatabase();
+try {
+    pool = mysql.createPool(dbConfig);
+    console.log('Database configuration loaded.');
+} catch (err) {
+    console.error('Database configuration error:', err);
+}
 
 // Helper: Hash Password (SHA256)
 const hashPassword = (password) => {
     return crypto.createHash('sha256').update(password).digest('hex');
 };
 
-// Middleware: Authenticate Token
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    // Format: "Bearer <TOKEN>"
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-        return res.status(401).json({ message: 'Akses ditolak. Token tidak ditemukan.' });
-    }
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ message: 'Token tidak valid atau kadaluwarsa.' });
-        }
-        req.user = user;
-        next();
-    });
-};
-
 // --- FILE UPLOAD STORAGE CONFIGURATION ---
+// Ensure upload directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
+    console.log(`[INFO] Created uploads directory at ${uploadDir}`);
 }
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, uploadDir);
+        const targetDir = path.join(__dirname, 'uploads');
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        cb(null, targetDir);
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -140,10 +70,9 @@ const upload = multer({ storage: storage });
 
 // --- API ROUTES ---
 
-// Public Route (Health Check)
 app.get('/api/test-db', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
-    if (!pool) return res.status(500).json({ status: 'error', message: 'Database belum siap. Cek terminal server.' });
+    if (!pool) return res.status(500).json({ status: 'error', message: 'Pool database belum terinisialisasi' });
     
     try {
         const connection = await pool.getConnection();
@@ -152,11 +81,11 @@ app.get('/api/test-db', async (req, res) => {
         res.json({ status: 'success', message: 'Terhubung ke MySQL Database!' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ status: 'error', message: 'Gagal ping database.', error: error.message });
+        res.status(500).json({ status: 'error', message: 'Gagal terhubung ke Database.', error: error.message });
     }
 });
 
-// Public Route (Login)
+// --- AUTH API ---
 app.post('/api/login', async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { username, password } = req.body;
@@ -166,15 +95,7 @@ app.post('/api/login', async (req, res) => {
         const [rows] = await pool.query('SELECT id, username, role FROM users WHERE username = ? AND password = ?', [username, hashedPassword]);
         
         if (rows.length > 0) {
-            const user = rows[0];
-            // Generate JWT Token
-            const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-            
-            res.json({ 
-                success: true, 
-                user: user,
-                token: token 
-            });
+            res.json({ success: true, user: rows[0] });
         } else {
             res.status(401).json({ success: false, message: 'Username atau password salah' });
         }
@@ -183,10 +104,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- PROTECTED ROUTES BELOW ---
-
-// Users Management
-app.get('/api/users', authenticateToken, async (req, res) => {
+app.get('/api/users', async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     try {
         const [rows] = await pool.query('SELECT id, username, role FROM users');
@@ -196,7 +114,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/users', authenticateToken, async (req, res) => {
+app.post('/api/users', async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { username, password } = req.body;
     try {
@@ -208,7 +126,7 @@ app.post('/api/users', authenticateToken, async (req, res) => {
     }
 });
 
-app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+app.delete('/api/users/:id', async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { id } = req.params;
     try {
@@ -219,8 +137,8 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Upload File
-app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
+// --- UPLOAD API ---
+app.post('/api/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
         return res.status(400).json({ status: 'error', message: 'No file uploaded' });
     }
@@ -228,41 +146,12 @@ app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => 
     res.json({ status: 'success', url: fileUrl });
 });
 
-// --- DASHBOARD SUMMARY API ---
-app.get('/api/dashboard-summary', authenticateToken, async (req, res) => {
-    if (!pool) return res.status(500).json({ message: 'DB not connected' });
-    try {
-        const [incomeRows] = await pool.query("SELECT SUM(grand_total) as total FROM transactions WHERE type = 'PEMASUKAN'");
-        const [expenseRows] = await pool.query("SELECT SUM(grand_total) as total FROM transactions WHERE type = 'PENGELUARAN'");
-        const [reimbursePendingRows] = await pool.query("SELECT SUM(grand_total) as total FROM reimbursements WHERE status = 'PENDING'");
-        
-        const totalIncome = parseFloat(incomeRows[0].total || 0);
-        const totalExpense = parseFloat(expenseRows[0].total || 0);
-        const totalReimbursePending = parseFloat(reimbursePendingRows[0].total || 0);
-
-        res.json({
-            totalIncome,
-            totalExpense,
-            totalReimbursePending,
-            balance: totalIncome - totalExpense
-        });
-    } catch (error) {
-        console.error('Error fetching dashboard summary:', error);
-        res.status(500).json({ message: 'Error fetching summary' });
-    }
-});
-
 // --- TRANSACTIONS API ---
-app.get('/api/transactions', authenticateToken, async (req, res) => {
+app.get('/api/transactions', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
-    
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 1000;
-    const offset = (page - 1) * limit;
-
     try {
-        const [rows] = await pool.query('SELECT * FROM transactions ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+        const [rows] = await pool.query('SELECT * FROM transactions ORDER BY created_at DESC');
         
         if (!rows || rows.length === 0) {
             return res.json([]);
@@ -297,7 +186,7 @@ app.get('/api/transactions', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/transactions', authenticateToken, async (req, res) => {
+app.post('/api/transactions', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const conn = await pool.getConnection();
@@ -330,7 +219,8 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
     }
 });
 
-app.delete('/api/transactions/:id', authenticateToken, async (req, res) => {
+// NEW: DELETE TRANSACTION
+app.delete('/api/transactions/:id', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { id } = req.params;
@@ -338,11 +228,13 @@ app.delete('/api/transactions/:id', authenticateToken, async (req, res) => {
         await pool.query('DELETE FROM transactions WHERE id = ?', [id]);
         res.json({ status: 'success', message: 'Transaction deleted' });
     } catch (error) {
+        console.error('Error deleting transaction:', error);
         res.status(500).json({ message: 'Failed to delete transaction', error: error.message });
     }
 });
 
-app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
+// NEW: UPDATE TRANSACTION (FULL UPDATE)
+app.put('/api/transactions/:id', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const conn = await pool.getConnection();
@@ -351,11 +243,17 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
 
     try {
         await conn.beginTransaction();
+
+        // 1. Update Main Table
         await conn.query(
             'UPDATE transactions SET date=?, type=?, expense_type=?, category=?, activity_name=?, description=?, grand_total=? WHERE id=?',
             [t.date, t.type, t.expenseType || null, t.category, t.activityName, t.description, t.grandTotal, id]
         );
+
+        // 2. Delete Old Items (Strategy: Wipe and Replace)
         await conn.query('DELETE FROM transaction_items WHERE transaction_id = ?', [id]);
+
+        // 3. Insert New Items
         if (t.items && t.items.length > 0) {
             for (const item of t.items) {
                  await conn.query(
@@ -364,27 +262,25 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
                  );
             }
         }
+
         await conn.commit();
         res.json({ status: 'success', message: 'Transaction updated' });
     } catch (error) {
         await conn.rollback();
+        console.error('Error updating transaction:', error);
         res.status(500).json({ message: 'Failed to update transaction', error: error.message });
     } finally {
         conn.release();
     }
 });
 
+
 // --- REIMBURSEMENTS API ---
-app.get('/api/reimbursements', authenticateToken, async (req, res) => {
+app.get('/api/reimbursements', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
-    
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 1000;
-    const offset = (page - 1) * limit;
-
     try {
-        const [rows] = await pool.query('SELECT * FROM reimbursements ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset]);
+        const [rows] = await pool.query('SELECT * FROM reimbursements ORDER BY created_at DESC');
         
         if (!rows || rows.length === 0) {
             return res.json([]);
@@ -416,21 +312,24 @@ app.get('/api/reimbursements', authenticateToken, async (req, res) => {
         }));
         res.json(reimbursements);
     } catch (error) {
+        console.error('Error fetching reimbursements:', error);
         res.status(500).json({ message: 'Error fetching reimbursements', error: error.toString() });
     }
 });
 
-app.post('/api/reimbursements', authenticateToken, async (req, res) => {
+app.post('/api/reimbursements', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
         const r = req.body;
+        
         await conn.query(
             'INSERT INTO reimbursements (id, date, requestor_name, category, activity_name, description, grand_total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [r.id, r.date, r.requestorName, r.category, r.activityName, r.description, r.grandTotal, 'PENDING']
         );
+
         if (r.items && r.items.length > 0) {
             for (const item of r.items) {
                  await conn.query(
@@ -439,17 +338,20 @@ app.post('/api/reimbursements', authenticateToken, async (req, res) => {
                  );
             }
         }
+
         await conn.commit();
         res.json({ status: 'success', message: 'Reimbursement saved' });
     } catch (error) {
         await conn.rollback();
+        console.error('Error saving reimbursement:', error);
         res.status(500).json({ message: 'Failed to save reimbursement', error: error.message });
     } finally {
         conn.release();
     }
 });
 
-app.put('/api/reimbursements/:id/details', authenticateToken, async (req, res) => {
+// NEW: UPDATE REIMBURSEMENT DETAILS (Content)
+app.put('/api/reimbursements/:id/details', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const conn = await pool.getConnection();
@@ -458,11 +360,17 @@ app.put('/api/reimbursements/:id/details', authenticateToken, async (req, res) =
 
     try {
         await conn.beginTransaction();
+
+        // 1. Update Main Table
         await conn.query(
             'UPDATE reimbursements SET date=?, requestor_name=?, category=?, activity_name=?, description=?, grand_total=? WHERE id=?',
             [r.date, r.requestorName, r.category, r.activityName, r.description, r.grandTotal, id]
         );
+
+        // 2. Delete Old Items
         await conn.query('DELETE FROM reimbursement_items WHERE reimbursement_id = ?', [id]);
+
+        // 3. Insert New Items
         if (r.items && r.items.length > 0) {
             for (const item of r.items) {
                  await conn.query(
@@ -471,17 +379,20 @@ app.put('/api/reimbursements/:id/details', authenticateToken, async (req, res) =
                  );
             }
         }
+
         await conn.commit();
         res.json({ status: 'success', message: 'Reimbursement details updated' });
     } catch (error) {
         await conn.rollback();
+        console.error('Error updating reimbursement details:', error);
         res.status(500).json({ message: 'Failed to update reimbursement', error: error.message });
     } finally {
         conn.release();
     }
 });
 
-app.delete('/api/reimbursements/:id', authenticateToken, async (req, res) => {
+// NEW: DELETE REIMBURSEMENT
+app.delete('/api/reimbursements/:id', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { id } = req.params;
@@ -489,15 +400,18 @@ app.delete('/api/reimbursements/:id', authenticateToken, async (req, res) => {
         await pool.query('DELETE FROM reimbursements WHERE id = ?', [id]);
         res.json({ status: 'success', message: 'Reimbursement deleted' });
     } catch (error) {
+        console.error('Error deleting reimbursement:', error);
         res.status(500).json({ message: 'Failed to delete reimbursement', error: error.message });
     }
 });
 
-app.put('/api/reimbursements/:id', authenticateToken, async (req, res) => {
+// UPDATE STATUS REIMBURSEMENT
+app.put('/api/reimbursements/:id', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { id } = req.params;
     const { status, rejectionReason, transferProofUrl } = req.body;
+    
     try {
         await pool.query(
             'UPDATE reimbursements SET status = ?, rejection_reason = ?, transfer_proof_url = IFNULL(?, transfer_proof_url) WHERE id = ?',
@@ -505,16 +419,23 @@ app.put('/api/reimbursements/:id', authenticateToken, async (req, res) => {
         );
         res.json({ status: 'success', message: 'Status updated' });
     } catch (error) {
+        console.error('Error updating reimbursement:', error);
         res.status(500).json({ message: 'Failed to update status', error: error.message });
     }
 });
 
-// Serve Static Frontend & Uploads
+// --- SERVE STATIC FRONTEND & UPLOADS ---
+
+// 1. Serve Uploads (Explicit Route for Persistence)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// 2. Serve Frontend
 const publicPath = path.join(__dirname, 'public');
+
 if (fs.existsSync(publicPath)) {
     console.log(`[INFO] Serving static files from: ${publicPath}`);
     app.use(express.static(publicPath));
+    
     app.get('*', (req, res) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/uploads')) {
             return res.status(404).json({ message: 'Not Found' });
