@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { LogOut, User as UserIcon, Calendar, Database, Bell, Check, Trash2, X } from 'lucide-react';
+import { LogOut, User as UserIcon, Calendar, Database, Bell } from 'lucide-react';
 import { User } from '../types';
 import { getCurrentDateFormatted, API_BASE_URL } from '../utils';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   user: User | null;
@@ -14,8 +15,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isDbConnected, onProfileClick }) => {
   const [notificationCount, setNotificationCount] = useState(0);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Only fetch for admin here, as employee has their own dashboard notifications
@@ -32,57 +32,10 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
         if (response.ok) {
             const data = await response.json();
             setNotificationCount(data.count);
-            setNotifications(data.notifications || []);
         }
     } catch (e) {
         console.error("Failed to fetch admin notifications");
     }
-  };
-
-  const markAllRead = async () => {
-      try {
-          await fetch(`${API_BASE_URL}/api/notifications/read-all`, {
-              method: 'PUT',
-              headers: { 'Authorization': `Bearer ${localStorage.getItem('rdr_token')}` }
-          });
-          setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-          setNotificationCount(0);
-      } catch (e) {
-          console.error("Failed to mark all read");
-      }
-  };
-
-  const clearAll = async () => {
-      if (!confirm('Hapus semua notifikasi?')) return;
-      try {
-          await fetch(`${API_BASE_URL}/api/notifications/clear-all`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${localStorage.getItem('rdr_token')}` }
-          });
-          setNotifications([]);
-          setNotificationCount(0);
-      } catch (e) {
-          console.error("Failed to clear notifications");
-      }
-  };
-
-  const deleteNotification = async (id: number) => {
-      try {
-           await fetch(`${API_BASE_URL}/api/notifications/${id}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${localStorage.getItem('rdr_token')}` }
-          });
-          
-          setNotifications(prev => {
-              const updated = prev.filter(n => n.id !== id);
-              // Recount unread
-              const unread = updated.filter(n => !n.is_read).length;
-              setNotificationCount(unread);
-              return updated;
-          });
-      } catch (e) {
-           console.error("Failed to delete notification");
-      }
   };
 
   return (
@@ -119,7 +72,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
         {user?.role === 'admin' && (
              <div className="relative">
                  <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
+                    onClick={() => navigate('/notifikasi')}
                     className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg cursor-pointer relative transition-colors"
                  >
                      <Bell size={20} />
@@ -127,64 +80,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
                          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                      )}
                  </button>
-
-                 {/* Notification Modal/Dropdown */}
-                 {showNotifications && (
-                     <div className="absolute right-0 mt-2 w-80 md:w-96 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50">
-                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                            <h3 className="font-semibold text-slate-800">Notifikasi</h3>
-                            <div className="flex gap-2">
-                                <button onClick={markAllRead} className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors" title="Tandai semua dibaca">
-                                    <Check size={14} /> Baca Semua
-                                </button>
-                                <button onClick={clearAll} className="text-xs flex items-center gap-1 text-rose-600 hover:text-rose-700 font-medium px-2 py-1 rounded hover:bg-rose-50 transition-colors" title="Hapus semua">
-                                    <Trash2 size={14} /> Hapus
-                                </button>
-                            </div>
-                        </div>
-                        <div className="max-h-[60vh] overflow-y-auto">
-                            {notifications.length === 0 ? (
-                                <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center gap-2">
-                                    <Bell size={32} className="text-slate-200" />
-                                    <p>Tidak ada notifikasi baru</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-slate-100">
-                                    {notifications.map((notif) => (
-                                        <div key={notif.id} className={`p-4 hover:bg-slate-50 transition-colors relative group ${!notif.is_read ? 'bg-blue-50/40' : ''}`}>
-                                            <div className="flex justify-between items-start gap-3">
-                                                <div className="flex-1">
-                                                    <p className={`text-sm ${!notif.is_read ? 'font-semibold text-slate-800' : 'text-slate-600'}`}>
-                                                        {notif.message}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
-                                                        <Calendar size={10} />
-                                                        {notif.timestamp ? new Date(notif.timestamp).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'}
-                                                    </p>
-                                                </div>
-                                                <button 
-                                                    onClick={() => deleteNotification(notif.id)}
-                                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
-                                                    title="Hapus notifikasi ini"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </div>
-                                            {!notif.is_read && (
-                                                <span className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l"></span>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                     </div>
-                 )}
-                 
-                 {/* Backdrop to close when clicking outside */}
-                 {showNotifications && (
-                     <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNotifications(false)}></div>
-                 )}
              </div>
         )}
 

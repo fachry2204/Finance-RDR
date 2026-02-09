@@ -1,0 +1,19 @@
+<div class="space-y-4">
+    <div>
+        <h4 class="font-bold text-slate-800">Versi 1.0.1</h4>
+        <ul class="list-disc pl-5 text-sm text-slate-600 mt-1 space-y-1">
+            <li>Menambahkan Laporan Pemasukan terpisah.</li>
+            <li>Memperbarui sistem notifikasi admin (Real-time & Riwayat).</li>
+            <li>Perbaikan tampilan Laporan Pengeluaran (Umum & Reimburse).</li>
+            <li>Menambahkan informasi versi di footer.</li>
+        </ul>
+    </div>
+    <div class="pt-4 border-t border-slate-100">
+        <h4 class="font-bold text-slate-800">Versi 1.0.0</h4>
+        <ul class="list-disc pl-5 text-sm text-slate-600 mt-1 space-y-1">
+            <li>Rilis awal sistem Keuangan RDR.</li>
+            <li>Fitur Jurnal, Reimbursement, dan Laporan Dasar.</li>
+            <li>Manajemen Pegawai dan Pengaturan Kategori.</li>
+        </ul>
+    </div>
+</div>
