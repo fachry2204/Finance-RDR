@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Tag, Database, CheckCircle, XCircle, Users, RefreshCw, UserPlus } from 'lucide-react';
 import { AppSettings, DatabaseConfig, User } from '../types';
+import { API_BASE_URL } from '../utils';
 
 interface SettingsProps {
   settings: AppSettings;
@@ -36,7 +37,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
   const fetchUsers = async () => {
       if (!authToken) return;
       try {
-          const res = await fetch('/api/users', {
+          const res = await fetch(`${API_BASE_URL}/api/users`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
           const data = await res.json();
@@ -55,7 +56,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
     if (authToken) {
        setCategoryLoading(true);
        try {
-          const res = await fetch('/api/categories', {
+          const res = await fetch(`${API_BASE_URL}/api/categories`, {
               method: 'POST',
               headers: { 
                  'Content-Type': 'application/json',
@@ -90,7 +91,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
 
     if (authToken) {
         try {
-            const res = await fetch(`/api/categories/${encodeURIComponent(cat)}`, {
+            const res = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(cat)}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${authToken}` }
             });
@@ -119,7 +120,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
 
       setUserLoading(true);
       try {
-          const res = await fetch('/api/users', {
+          const res = await fetch(`${API_BASE_URL}/api/users`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
       if(!confirm("Yakin ingin menghapus user ini?")) return;
       if (!authToken) return alert("Sesi habis");
       try {
-          const res = await fetch(`/api/users/${id}`, { 
+          const res = await fetch(`${API_BASE_URL}/api/users/${id}`, { 
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
@@ -164,7 +165,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
     setDbMessage(null);
     try {
       // Test DB route is public, but we can secure it if needed. Leaving public for diagnostics.
-      const response = await fetch('/api/test-db');
+      const response = await fetch(`${API_BASE_URL}/api/test-db`);
       const data = await response.json();
       if (data.status === 'success') {
         setDbConfig(prev => ({ ...prev, isConnected: true }));

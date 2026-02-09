@@ -13,6 +13,7 @@ import EmployeeManager from './components/EmployeeManager';
 import EmployeeDashboard from './components/EmployeeDashboard';
 import { Transaction, Reimbursement, PageView, AppSettings, User } from './types';
 import { AlertTriangle } from 'lucide-react';
+import { API_BASE_URL } from './utils';
 
 const App: React.FC = () => {
   // Auth State
@@ -40,7 +41,7 @@ const App: React.FC = () => {
   // --- DATABASE CONNECTION CHECK & AUTO LOGOUT ---
   const checkDbConnection = async () => {
     try {
-      const response = await fetch('/api/test-db');
+      const response = await fetch(`${API_BASE_URL}/api/test-db`);
       const data = await response.json();
       const isConnected = data.status === 'success';
       setIsDbConnected(isConnected);
@@ -95,7 +96,8 @@ const App: React.FC = () => {
       };
 
       try {
-          const response = await fetch(url, { ...options, headers });
+          const fullUrl = url.startsWith('/api') ? `${API_BASE_URL}${url}` : url;
+          const response = await fetch(fullUrl, { ...options, headers });
           
           if (response.status === 401 || response.status === 403) {
               handleLogoutConfirm(); // Token Expired
@@ -112,8 +114,7 @@ const App: React.FC = () => {
   // --- APP SETTINGS STATE (No LocalStorage) ---
   const [appSettings, setAppSettings] = useState<AppSettings>({
     categories: [], // Loaded from DB
-    database: { host: '', user: '', password: '', name: '', port: '3306', isConnected: false },
-    drive: { isConnected: false, selectedFolderId: '', selectedFolderName: '', autoUpload: false }
+    database: { host: '', user: '', password: '', name: '', port: '3306', isConnected: false }
   });
 
   const handleUpdateSettings = (newSettings: AppSettings) => setAppSettings(newSettings);
@@ -149,7 +150,6 @@ const App: React.FC = () => {
           setAppSettings(prev => ({ 
             ...prev, 
             categories: Array.isArray(catData) ? catData : [],
-            drive: settingsData?.drive || prev.drive,
             database: { ...prev.database, isConnected: true } 
           }));
         };

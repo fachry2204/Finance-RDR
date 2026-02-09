@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Pencil, Search, User, Mail, Phone, Briefcase, Lock, Save, X, RefreshCw, AlertCircle } from 'lucide-react';
 import { Employee } from '../types';
+import { API_BASE_URL } from '../utils';
 
 interface EmployeeManagerProps {
   authToken: string | null;
@@ -31,7 +32,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ authToken }) => {
   const fetchEmployees = async () => {
     setFetchError(null);
     try {
-      const res = await fetch('/api/employees', {
+      const res = await fetch(`${API_BASE_URL}/api/employees`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       });
 
@@ -88,11 +89,11 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ authToken }) => {
     const payload = { name, position, phone, email, username, password };
 
     try {
-      let url = '/api/employees';
+      let url = `${API_BASE_URL}/api/employees`;
       let method = 'POST';
 
       if (isEditing && currentId) {
-        url = `/api/employees/${currentId}`;
+        url = `${API_BASE_URL}/api/employees/${currentId}`;
         method = 'PUT';
       }
 
@@ -141,7 +142,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ authToken }) => {
     if (!authToken) return;
 
     try {
-      const res = await fetch(`/api/employees/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/employees/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${authToken}` }
       });

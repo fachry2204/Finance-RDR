@@ -67,18 +67,9 @@ export interface DatabaseConfig {
   isConnected: boolean;
 }
 
-export interface GoogleDriveConfig {
-  isConnected: boolean;
-  selectedFolderId: string;
-  selectedFolderName: string;
-  autoUpload: boolean;
-  email?: string;
-}
-
 export interface AppSettings {
   categories: string[];
   database: DatabaseConfig;
-  drive: GoogleDriveConfig;
 }
 
 export interface Employee {

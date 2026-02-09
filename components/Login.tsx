@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Lock, User, Database, AlertCircle, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '../utils';
 
 interface LoginProps {
   onLogin: (user: any, token: string) => void;
@@ -21,7 +22,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
     setError('');
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })

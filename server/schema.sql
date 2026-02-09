@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS transaction_items (
     price DECIMAL(15, 2),
     total DECIMAL(15, 2),
     file_url TEXT,
-    drive_file_id VARCHAR(255),
     FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
 );
 
@@ -50,7 +49,6 @@ CREATE TABLE IF NOT EXISTS reimbursement_items (
     price DECIMAL(15, 2),
     total DECIMAL(15, 2),
     file_url TEXT,
-    drive_file_id VARCHAR(255),
     FOREIGN KEY (reimbursement_id) REFERENCES reimbursements(id) ON DELETE CASCADE
 );
 
