@@ -47,8 +47,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-900">
       
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0 z-0">
+          <img 
+            src="https://ruangdimensirecords.com/img/bg.jpg" 
+            alt="Background" 
+            className="w-full h-full object-cover opacity-50"
+          />
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]"></div>
+      </div>
+
       {/* Database Status Indicator - Top Right */}
       <div className={`absolute top-4 right-4 z-10 inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium border shadow-sm transition-all duration-300 ${isDbConnected ? 'bg-white text-emerald-700 border-emerald-100' : 'bg-white text-rose-700 border-rose-100'}`}>
         <div className={`w-2.5 h-2.5 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
@@ -76,12 +86,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
         </div>
       )}
 
-      <div className={`bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 transition-all duration-300 ${!isDbConnected ? 'filter blur-sm pointer-events-none' : ''}`}>
+      <div className={`relative z-10 bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 transition-all duration-300 ${!isDbConnected ? 'filter blur-sm pointer-events-none' : ''}`}>
         <div className="text-center mb-8">
           <img 
             src="https://ruangdimensirecords.com/img/logo.png" 
             alt="RDR Logo" 
-            className="h-24 w-auto mx-auto mb-6 object-contain"
+            className="h-24 w-auto mx-auto mb-6 object-contain drop-shadow-md"
           />
           <h1 className="text-2xl font-bold text-slate-800">Selamat Datang</h1>
           <p className="text-slate-500">Sistem Informasi Keuangan RDR</p>
