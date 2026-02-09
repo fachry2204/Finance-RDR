@@ -12,6 +12,7 @@ interface ReimbursementProps {
   onUpdateReimbursementDetails: (reimb: Reimbursement) => void; 
   categories: string[];
   authToken: string | null;
+  isEmployeeView?: boolean;
 }
 
 const ReimbursementPage: React.FC<ReimbursementProps> = ({ 
@@ -21,7 +22,8 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   onDeleteReimbursement,
   onUpdateReimbursementDetails,
   categories,
-  authToken 
+  authToken,
+  isEmployeeView = false
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   const [selectedReimb, setSelectedReimb] = useState<Reimbursement | null>(null);
@@ -198,8 +200,8 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   // --- EDIT & DELETE HANDLERS ---
   const handleEdit = (e: React.MouseEvent, r: Reimbursement) => {
     e.stopPropagation();
-    if (r.status !== 'PENDING') {
-        alert("Hanya pengajuan berstatus PENDING yang dapat diedit.");
+    if (r.status !== 'PENDING' && r.status !== 'DITOLAK') {
+        alert("Hanya pengajuan berstatus PENDING atau DITOLAK yang dapat diedit.");
         return;
     }
     setEditingReimbId(r.id);
@@ -504,8 +506,8 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                            >
                              <Eye size={18} />
                            </button>
-                           {/* Allow Edit/Delete only if Status is PENDING */}
-                           {r.status === 'PENDING' && (
+                           {/* Allow Edit/Delete based on Status and View */}
+                           {(r.status === 'PENDING' || r.status === 'DITOLAK') && (
                              <>
                                <button 
                                  onClick={(e) => handleEdit(e, r)}
@@ -514,13 +516,15 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                                >
                                  <Pencil size={18} />
                                </button>
-                               <button 
-                                 onClick={(e) => handleDelete(e, r)}
-                                 className="text-slate-500 hover:text-rose-600 p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                                 title="Hapus"
-                               >
-                                 <Trash2 size={18} />
-                               </button>
+                               {!isEmployeeView && (
+                                   <button 
+                                     onClick={(e) => handleDelete(e, r)}
+                                     className="text-slate-500 hover:text-rose-600 p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                     title="Hapus"
+                                   >
+                                     <Trash2 size={18} />
+                                   </button>
+                               )}
                              </>
                            )}
                         </div>
@@ -636,6 +640,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                   </div>
 
                   {/* ADMIN ACTION SECTION */}
+                  {!isEmployeeView && (
                   <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-lg border border-blue-100 dark:border-blue-800">
                     <h4 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                        <User size={18} /> Aksi Admin
@@ -731,6 +736,7 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
               </div>
             </div>

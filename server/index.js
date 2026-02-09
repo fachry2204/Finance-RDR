@@ -556,7 +556,18 @@ app.get('/api/reimbursements', authenticateToken, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     try {
-        const [rows] = await pool.query('SELECT * FROM reimbursements ORDER BY created_at DESC');
+        let query = 'SELECT * FROM reimbursements';
+        let params = [];
+
+        // Filter jika user adalah employee
+        if (req.user.role === 'employee') {
+            query += ' WHERE requestor_name = ?';
+            params.push(req.user.name);
+        }
+
+        query += ' ORDER BY created_at DESC';
+
+        const [rows] = await pool.query(query, params);
         
         if (!rows || rows.length === 0) {
             return res.json([]);
@@ -601,9 +612,12 @@ app.post('/api/reimbursements', authenticateToken, async (req, res) => {
         await conn.beginTransaction();
         const r = req.body;
         
+        // Enforce requestor_name for employees
+        const requestorName = req.user.role === 'employee' ? req.user.name : r.requestorName;
+
         await conn.query(
             'INSERT INTO reimbursements (id, date, requestor_name, category, activity_name, description, grand_total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [r.id, r.date, r.requestorName, r.category, r.activityName, r.description, r.grandTotal, 'PENDING']
+            [r.id, r.date, requestorName, r.category, r.activityName, r.description, r.grandTotal, 'PENDING']
         );
 
         if (r.items && r.items.length > 0) {
@@ -635,9 +649,34 @@ app.put('/api/reimbursements/:id/details', authenticateToken, async (req, res) =
 
     try {
         await conn.beginTransaction();
+
+        // Check permission for employees
+        if (req.user.role === 'employee') {
+            const [existing] = await conn.query('SELECT requestor_name, status FROM reimbursements WHERE id = ?', [id]);
+            if (existing.length === 0) {
+                await conn.rollback();
+                return res.status(404).json({ message: 'Reimbursement not found' });
+            }
+            const reimb = existing[0];
+            
+            // Ownership check
+            if (reimb.requestor_name !== req.user.name) {
+                 await conn.rollback();
+                 return res.status(403).json({ message: 'Unauthorized' });
+            }
+
+            // Status check (only PENDING or DITOLAK can be edited)
+            if (reimb.status !== 'PENDING' && reimb.status !== 'DITOLAK') {
+                await conn.rollback();
+                return res.status(403).json({ message: 'Cannot edit reimbursement that is already processed' });
+            }
+        }
+
+        const requestorName = req.user.role === 'employee' ? req.user.name : r.requestorName;
+
         await conn.query(
-            'UPDATE reimbursements SET date=?, requestor_name=?, category=?, activity_name=?, description=?, grand_total=? WHERE id=?',
-            [r.date, r.requestorName, r.category, r.activityName, r.description, r.grandTotal, id]
+            'UPDATE reimbursements SET date=?, requestor_name=?, category=?, activity_name=?, description=?, grand_total=?, status=? WHERE id=?',
+            [r.date, requestorName, r.category, r.activityName, r.description, r.grandTotal, 'PENDING', id]
         );
         await conn.query('DELETE FROM reimbursement_items WHERE reimbursement_id = ?', [id]);
         if (r.items && r.items.length > 0) {
@@ -661,6 +700,12 @@ app.put('/api/reimbursements/:id/details', authenticateToken, async (req, res) =
 app.delete('/api/reimbursements/:id', authenticateToken, async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    
+    // Employees cannot delete
+    if (req.user.role === 'employee') {
+        return res.status(403).json({ message: 'Employees cannot delete reimbursements' });
+    }
+
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM reimbursements WHERE id = ?', [id]);

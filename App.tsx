@@ -223,7 +223,12 @@ const App: React.FC = () => {
   if (currentUser?.role === 'employee') {
       return (
           <>
-            <EmployeeDashboard user={currentUser} onLogout={() => setShowLogoutModal(true)} />
+            <EmployeeDashboard 
+                user={currentUser} 
+                authToken={token}
+                categories={appSettings.categories}
+                onLogout={() => setShowLogoutModal(true)} 
+            />
              {showLogoutModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fade-in">
                 <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">

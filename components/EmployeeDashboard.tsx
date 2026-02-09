@@ -1,16 +1,117 @@
-
-import React from 'react';
-import { User, LogOut, Bell, Briefcase, Phone, Mail, FileText, Calendar, CheckCircle } from 'lucide-react';
-import { User as UserType } from '../types';
-import { getCurrentDateFormatted } from '../utils';
+import React, { useState, useEffect } from 'react';
+import { User, LogOut, Bell, Briefcase, Phone, Mail, FileText, Calendar, DollarSign, ChevronLeft } from 'lucide-react';
+import { User as UserType, Reimbursement } from '../types';
+import { getCurrentDateFormatted, API_BASE_URL } from '../utils';
+import ReimbursementPage from './Reimbursement';
 
 interface EmployeeDashboardProps {
   user: UserType;
+  authToken: string | null;
+  categories: string[];
   onLogout: () => void;
 }
 
-const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, onLogout }) => {
+const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, categories, onLogout }) => {
   const employeeDetails = user.details;
+  const [view, setView] = useState<'DASHBOARD' | 'REIMBURSEMENT'>('DASHBOARD');
+  const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
+
+  useEffect(() => {
+    fetchReimbursements();
+  }, [authToken]);
+
+  const fetchReimbursements = async () => {
+    if (!authToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/reimbursements`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setReimbursements(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch reimbursements", error);
+    }
+  };
+
+  const handleAddReimbursement = async (reimb: Reimbursement) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/reimbursements`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify(reimb)
+        });
+        if (response.ok) {
+            alert('Pengajuan berhasil disimpan');
+            fetchReimbursements();
+        } else {
+            const err = await response.json();
+            alert('Gagal menyimpan: ' + err.message);
+        }
+    } catch (error) {
+        alert('Terjadi kesalahan saat menyimpan');
+    }
+  };
+
+  const handleUpdateReimbursementDetails = async (reimb: Reimbursement) => {
+      try {
+          const response = await fetch(`${API_BASE_URL}/api/reimbursements/${reimb.id}/details`, {
+              method: 'PUT',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${authToken}`
+              },
+              body: JSON.stringify(reimb)
+          });
+          if (response.ok) {
+              alert('Pengajuan berhasil diupdate');
+              fetchReimbursements();
+          } else {
+              const err = await response.json();
+              alert('Gagal update: ' + err.message);
+          }
+      } catch (error) {
+          alert('Terjadi kesalahan saat update');
+      }
+  };
+
+  // Dummy handlers for actions not allowed for employees (just in case)
+  const handleUpdateReimbursementStatus = (reimb: Reimbursement) => {
+      console.warn("Employees cannot update status");
+  };
+
+  const handleDeleteReimbursement = (id: string) => {
+      console.warn("Employees cannot delete reimbursements");
+  };
+
+  if (view === 'REIMBURSEMENT') {
+      return (
+          <div className="min-h-screen bg-slate-50 font-sans pb-20">
+              <div className="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-30 flex items-center gap-3">
+                  <button onClick={() => setView('DASHBOARD')} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                      <ChevronLeft size={24} />
+                  </button>
+                  <h1 className="text-lg font-bold">Reimbursement</h1>
+              </div>
+              <div className="p-4">
+                  <ReimbursementPage 
+                    reimbursements={reimbursements}
+                    onAddReimbursement={handleAddReimbursement}
+                    onUpdateReimbursement={handleUpdateReimbursementStatus}
+                    onDeleteReimbursement={handleDeleteReimbursement}
+                    onUpdateReimbursementDetails={handleUpdateReimbursementDetails}
+                    categories={categories}
+                    authToken={authToken}
+                    isEmployeeView={true}
+                  />
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-20">
@@ -50,6 +151,26 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, onLogout })
 
       <div className="px-4 -mt-8 relative z-20 space-y-6">
          
+         {/* Menu Grid */}
+         <div className="grid grid-cols-2 gap-4">
+             <button 
+                onClick={() => setView('REIMBURSEMENT')}
+                className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-blue-50 transition-colors group"
+             >
+                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    <DollarSign size={24} />
+                </div>
+                <span className="font-semibold text-slate-700 group-hover:text-blue-700">Reimbursement</span>
+             </button>
+
+             <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center gap-3 opacity-50 cursor-not-allowed">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                    <Calendar size={24} />
+                </div>
+                <span className="font-semibold text-slate-400">Absensi</span>
+             </div>
+         </div>
+
          {/* Profile Card */}
          <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-100">
             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -97,22 +218,6 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, onLogout })
             </div>
          </div>
 
-      </div>
-
-      {/* Simple Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 flex justify-around text-xs font-medium text-slate-400 z-50">
-         <button className="flex flex-col items-center gap-1 text-blue-600">
-            <User size={20} />
-            <span>Profil</span>
-         </button>
-         <button className="flex flex-col items-center gap-1 hover:text-slate-600">
-            <CheckCircle size={20} />
-            <span>Tugas</span>
-         </button>
-         <button className="flex flex-col items-center gap-1 hover:text-slate-600">
-            <Bell size={20} />
-            <span>Info</span>
-         </button>
       </div>
     </div>
   );
