@@ -1,49 +1,49 @@
 
 import React from 'react';
 import { LayoutDashboard, Receipt, FileText, X, PlusCircle, PieChart, Wallet, List, Settings as SettingsIcon, Users } from 'lucide-react';
-import { PageView } from '../types';
+import { Link, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
-  activePage: PageView;
-  setActivePage: (page: PageView) => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isOpen, setIsOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
+  const location = useLocation();
+  const currentPath = location.pathname;
   
   const menuGroups = [
     {
       title: 'Menu Utama',
       items: [
-        { id: 'DASHBOARD' as PageView, label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'JOURNAL_LIST' as PageView, label: 'Semua Jurnal', icon: List },
-        { id: 'REPORT' as PageView, label: 'Laporan Umum', icon: FileText },
+        { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/jurnal', label: 'Semua Jurnal', icon: List },
+        { path: '/laporan', label: 'Laporan Umum', icon: FileText },
       ]
     },
     {
       title: 'Pengeluaran',
       items: [
-        { id: 'STAT_EXPENSE' as PageView, label: 'Dashboard Cash Out', icon: PieChart },
-        { id: 'ADD_EXPENSE' as PageView, label: 'Tambah Pengeluaran', icon: PlusCircle },
-        { id: 'REIMBURSE' as PageView, label: 'Tambah Reimburse', icon: Receipt },
-        { id: 'REPORT_EXPENSE' as PageView, label: 'Laporan Pengeluaran', icon: FileText },
+        { path: '/pengeluaran/dashboard', label: 'Dashboard Cash Out', icon: PieChart },
+        { path: '/pengeluaran/tambah', label: 'Tambah Pengeluaran', icon: PlusCircle },
+        { path: '/reimburse', label: 'Tambah Reimburse', icon: Receipt },
+        { path: '/pengeluaran/laporan', label: 'Laporan Pengeluaran', icon: FileText },
       ]
     },
     {
       title: 'Pemasukan',
       items: [
-        { id: 'ADD_INCOME' as PageView, label: 'Tambah Pemasukan', icon: Wallet },
-        { id: 'STAT_INCOME' as PageView, label: 'Statistik Pemasukan', icon: PieChart },
+        { path: '/pemasukan/tambah', label: 'Tambah Pemasukan', icon: Wallet },
+        { path: '/pemasukan/statistik', label: 'Statistik Pemasukan', icon: PieChart },
       ]
     },
     {
       title: 'Lainnya',
       items: [
-        { id: 'EMPLOYEES' as PageView, label: 'Data Pegawai', icon: Users },
-        { id: 'SETTINGS' as PageView, label: 'Pengaturan', icon: SettingsIcon },
+        { path: '/pegawai', label: 'Data Pegawai', icon: Users },
+        { path: '/pengaturan', label: 'Pengaturan', icon: SettingsIcon },
       ]
-    }
+    },
   ];
 
   return (
@@ -75,14 +75,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isOpen, se
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
-                  const isActive = activePage === item.id;
+                  const isActive = currentPath === item.path;
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setActivePage(item.id);
-                        setIsOpen(false);
-                      }}
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsOpen(false)}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm ${
                         isActive 
                           ? 'bg-blue-600 text-white shadow-md shadow-blue-200' 
@@ -91,18 +89,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, setActivePage, isOpen, se
                     >
                       <Icon size={18} />
                       <span className="font-medium">{item.label}</span>
-                    </button>
+                    </Link>
                   );
                 })}
               </div>
             </div>
           ))}
         </nav>
-
-        {/* Footer Section */}
-        <div className="p-4 text-xs text-center text-slate-400 border-t border-slate-100">
-           v1.0.0 Stable
-        </div>
       </div>
     </>
   );

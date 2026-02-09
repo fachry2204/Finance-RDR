@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Sidebar from './components/Sidebar';
@@ -12,7 +12,7 @@ import Login from './components/Login';
 import EmployeeManager from './components/EmployeeManager';
 import EmployeeDashboard from './components/EmployeeDashboard';
 import ProfileModal from './components/ProfileModal';
-import { Transaction, Reimbursement, PageView, AppSettings, User } from './types';
+import { Transaction, Reimbursement, AppSettings, User } from './types';
 import { AlertTriangle } from 'lucide-react';
 import { API_BASE_URL } from './utils';
 
@@ -26,7 +26,7 @@ const App: React.FC = () => {
   const [isDbConnected, setIsDbConnected] = useState(true);
 
   // App State
-  const [activePage, setActivePage] = useState<PageView>('DASHBOARD');
+  // const [activePage, setActivePage] = useState<PageView>('DASHBOARD'); // REMOVED
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Check LocalStorage for Persisted Login (Session Only)
@@ -217,91 +217,55 @@ const App: React.FC = () => {
     await authFetch(`/api/reimbursements/${updatedReimb.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: updatedReimb.status, rejectionReason: updatedReimb.rejectionReason }) });
   };
 
-  const renderContent = () => {
-    const commonProps = { authToken: token };
+  const commonProps = { authToken: token };
 
-    switch (activePage) {
-      case 'DASHBOARD': return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="ALL" />;
-      case 'STAT_EXPENSE': return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="EXPENSE" />;
-      case 'ADD_EXPENSE': return <Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />;
-      case 'REIMBURSE': return <ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onDeleteReimbursement={handleDeleteReimbursement} onUpdateReimbursementDetails={handleUpdateReimbursementDetails} onUpdateReimbursement={handleUpdateReimbursementStatus} categories={appSettings.categories} {...commonProps} />;
-      case 'REPORT_EXPENSE': return <Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" categories={appSettings.categories} />;
-      case 'ADD_INCOME': return <Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />;
-      case 'STAT_INCOME': return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="INCOME" />;
-      case 'JOURNAL_LIST': return <Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />;
-      case 'REPORT': return <Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} />;
-      case 'EMPLOYEES': return <EmployeeManager {...commonProps} />;
-      case 'SETTINGS': return <Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} {...commonProps} />;
-      default: return <Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} />;
-    }
+  // --- LAYOUT COMPONENTS ---
+  
+  const AdminLayout = () => {
+    return (
+      <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
+        <Header 
+          user={currentUser} 
+          onLogoutClick={() => setShowLogoutModal(true)} 
+          toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          isDbConnected={isDbConnected}
+          onProfileClick={() => setShowProfileModal(true)}
+        />
+        <div className="flex flex-1 pt-16 overflow-hidden">
+          <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+              <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-thin">
+                  <div className="max-w-7xl mx-auto">
+                      <Outlet />
+                  </div>
+              </main>
+              <div className="shrink-0 z-20">
+                <Footer />
+              </div>
+          </div>
+        </div>
+        <SharedModals />
+      </div>
+    );
   };
 
-  // --- RENDER LOGIC ---
+  const EmployeeLayout = () => {
+    return (
+      <>
+        <EmployeeDashboard 
+            user={currentUser!} 
+            authToken={token}
+            categories={appSettings.categories}
+            onLogout={() => setShowLogoutModal(true)}
+            onProfileClick={() => setShowProfileModal(true)} 
+        />
+        <SharedModals />
+      </>
+    );
+  };
 
-  if (!isLoggedIn) {
-      return <Login onLogin={handleLogin} isDbConnected={isDbConnected} />;
-  }
-
-  // IF ROLE IS EMPLOYEE, SHOW MOBILE DASHBOARD
-  if (currentUser?.role === 'employee') {
-      return (
-          <>
-            <EmployeeDashboard 
-                user={currentUser} 
-                authToken={token}
-                categories={appSettings.categories}
-                onLogout={() => setShowLogoutModal(true)}
-                onProfileClick={() => setShowProfileModal(true)} 
-            />
-            <ProfileModal 
-                user={currentUser}
-                isOpen={showProfileModal}
-                onClose={() => setShowProfileModal(false)}
-                onUpdateProfile={handleUpdateProfile}
-            />
-             {showLogoutModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fade-in">
-                <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
-                    <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-600">
-                    <AlertTriangle size={32} />
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">Konfirmasi Keluar</h3>
-                    <p className="text-slate-500 mb-6">Anda yakin ingin keluar?</p>
-                    <div className="flex gap-3 justify-center">
-                    <button onClick={() => setShowLogoutModal(false)} className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors">Batal</button>
-                    <button onClick={handleLogoutConfirm} className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 shadow-md shadow-rose-200 transition-colors">Keluar</button>
-                    </div>
-                </div>
-                </div>
-            )}
-          </>
-      );
-  }
-
-  // DEFAULT ADMIN VIEW
-  return (
-    <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
-      <Header 
-        user={currentUser} 
-        onLogoutClick={() => setShowLogoutModal(true)} 
-        toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        isDbConnected={isDbConnected}
-        onProfileClick={() => setShowProfileModal(true)}
-      />
-      <div className="flex flex-1 pt-16 overflow-hidden">
-        <Sidebar activePage={activePage} setActivePage={setActivePage} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-thin">
-                <div className="max-w-7xl mx-auto">
-                    {renderContent()}
-                </div>
-            </main>
-            <div className="shrink-0 z-20">
-              <Footer />
-            </div>
-        </div>
-      </div>
-
+  const SharedModals = () => (
+    <>
       {showLogoutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
@@ -324,7 +288,64 @@ const App: React.FC = () => {
         onClose={() => setShowProfileModal(false)}
         onUpdateProfile={handleUpdateProfile}
       />
-    </div>
+    </>
+  );
+
+  // --- MAIN RENDER ---
+
+  if (!isLoggedIn) {
+      return (
+        <BrowserRouter>
+          <Routes>
+             <Route path="*" element={<Login onLogin={handleLogin} isDbConnected={isDbConnected} />} />
+          </Routes>
+        </BrowserRouter>
+      );
+  }
+
+  // Redirect Logic based on Role
+  const DefaultRedirect = () => {
+    if (currentUser?.role === 'employee') {
+      return <Navigate to="/employee" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  };
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public/Auth Routes */}
+        <Route path="/login" element={!isLoggedIn ? <Login onLogin={handleLogin} isDbConnected={isDbConnected} /> : <Navigate to="/" />} />
+
+        {/* Employee Routes */}
+        {currentUser?.role === 'employee' && (
+           <Route path="/employee/*" element={<EmployeeLayout />} />
+        )}
+
+        {/* Admin Routes */}
+        {currentUser?.role !== 'employee' && (
+          <Route element={<AdminLayout />}>
+            <Route path="/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="ALL" />} />
+            <Route path="/jurnal" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />} />
+            <Route path="/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} />} />
+            
+            <Route path="/pengeluaran/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="EXPENSE" />} />
+            <Route path="/pengeluaran/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />} />
+            <Route path="/reimburse" element={<ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onDeleteReimbursement={handleDeleteReimbursement} onUpdateReimbursementDetails={handleUpdateReimbursementDetails} onUpdateReimbursement={handleUpdateReimbursementStatus} categories={appSettings.categories} {...commonProps} />} />
+            <Route path="/pengeluaran/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" categories={appSettings.categories} />} />
+            
+            <Route path="/pemasukan/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />} />
+            <Route path="/pemasukan/statistik" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="INCOME" />} />
+            
+            <Route path="/pegawai" element={<EmployeeManager {...commonProps} />} />
+            <Route path="/pengaturan" element={<Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} {...commonProps} />} />
+          </Route>
+        )}
+
+        {/* Catch All - Redirect to Default */}
+        <Route path="*" element={<DefaultRedirect />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
 

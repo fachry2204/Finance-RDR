@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, LogOut, Bell, Briefcase, Phone, Mail, FileText, Calendar, DollarSign, ChevronLeft } from 'lucide-react';
 import { User as UserType, Reimbursement } from '../types';
 import { getCurrentDateFormatted, API_BASE_URL } from '../utils';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ReimbursementPage from './Reimbursement';
 
 interface EmployeeDashboardProps {
@@ -13,8 +14,11 @@ interface EmployeeDashboardProps {
 }
 
 const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, categories, onLogout, onProfileClick }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isReimbursementPage = location.pathname.includes('/reimburse');
+
   const employeeDetails = user.details;
-  const [view, setView] = useState<'DASHBOARD' | 'REIMBURSEMENT'>('DASHBOARD');
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
 
@@ -106,11 +110,11 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
       console.warn("Employees cannot delete reimbursements");
   };
 
-  if (view === 'REIMBURSEMENT') {
+  if (isReimbursementPage) {
       return (
           <div className="min-h-screen bg-slate-50 font-sans pb-20">
               <div className="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-30 flex items-center gap-3">
-                  <button onClick={() => setView('DASHBOARD')} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                  <button onClick={() => navigate('/employee')} className="p-1 hover:bg-white/20 rounded-full transition-colors">
                       <ChevronLeft size={24} />
                   </button>
                   <h1 className="text-lg font-bold">Reimbursement</h1>
@@ -204,7 +208,7 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
         {/* Menu Grid */}
         <div className="grid grid-cols-2 gap-4">
             <button 
-               onClick={() => setView('REIMBURSEMENT')}
+               onClick={() => navigate('/employee/reimburse')}
                className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-blue-50 transition-colors group"
             >
                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
