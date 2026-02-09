@@ -12,6 +12,7 @@ import Login from './components/Login';
 import EmployeeManager from './components/EmployeeManager';
 import EmployeeDashboard from './components/EmployeeDashboard';
 import ProfileModal from './components/ProfileModal';
+import NotificationManager from './components/NotificationManager';
 import { Transaction, Reimbursement, AppSettings, User } from './types';
 import { AlertTriangle } from 'lucide-react';
 import { API_BASE_URL } from './utils';
@@ -338,6 +339,7 @@ const App: React.FC = () => {
             <Route path="/pemasukan/statistik" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="INCOME" />} />
             
             <Route path="/pegawai" element={<EmployeeManager {...commonProps} />} />
+            <Route path="/notifikasi" element={<NotificationManager {...commonProps} />} />
             <Route path="/pengaturan" element={<Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} {...commonProps} />} />
           </Route>
         )}

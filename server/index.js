@@ -96,6 +96,9 @@ const initDatabase = async () => {
         // 6. Explicitly Ensure Employees Table Exists (Safety Check)
         await ensureEmployeesTable();
 
+        // 7. Ensure Notifications Table Exists
+        await ensureNotificationsTable();
+
     } catch (err) {
         console.error('\n===================================================');
         console.error('[FATAL] KONEKSI DATABASE GAGAL');
@@ -153,6 +156,26 @@ const ensureEmployeesTable = async () => {
         console.error('[WARN] Gagal verifikasi tabel employees:', error.message);
     }
 }
+
+const ensureNotificationsTable = async () => {
+    if (!pool) return;
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NULL COMMENT 'NULL means broadcast to all employees',
+                message TEXT NOT NULL,
+                type ENUM('info', 'warning', 'success', 'error') DEFAULT 'info',
+                is_read BOOLEAN DEFAULT FALSE,
+                created_by INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('[SUCCESS] Tabel notifications terverifikasi.');
+    } catch (error) {
+        console.error('[WARN] Gagal verifikasi tabel notifications:', error.message);
+    }
+};
 
 const ensureUsersTableSchema = async () => {
     if (!pool) return;
@@ -886,8 +909,23 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
                 });
             }
         } else {
-            // Employee: Count recent updates (DITOLAK/BERHASIL) or PENDING
-            // For simplicity: Show pending count and recent processed
+            // Employee: 
+            // 1. Manual Notifications (Targeted or Broadcast)
+            const [manualNotifs] = await pool.query(
+                "SELECT * FROM notifications WHERE (user_id = ? OR user_id IS NULL) AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) ORDER BY created_at DESC", 
+                [userId]
+            );
+
+            manualNotifs.forEach(n => {
+                notifications.push({
+                    id: `manual-${n.id}`,
+                    message: n.message,
+                    type: n.type || 'info',
+                    timestamp: n.created_at
+                });
+            });
+
+            // 2. Count PENDING reimbursements
             const [pendingRows] = await pool.query("SELECT COUNT(*) as count FROM reimbursements WHERE requestor_name = ? AND status = 'PENDING'", [requestorName]);
             const pendingCount = pendingRows[0].count;
 
@@ -917,6 +955,28 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('[API ERROR] Get notifications failed:', error);
         res.status(500).json({ message: 'Gagal mengambil notifikasi' });
+    }
+});
+
+app.post('/api/notifications', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    
+    // Only admin can create notifications
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { userId, message, type } = req.body; // userId null means broadcast
+
+    try {
+        await pool.query(
+            'INSERT INTO notifications (user_id, message, type, created_by) VALUES (?, ?, ?, ?)',
+            [userId || null, message, type || 'info', req.user.id]
+        );
+        res.json({ success: true, message: 'Notifikasi berhasil dikirim' });
+    } catch (error) {
+        console.error('[API ERROR] Post notification failed:', error);
+        res.status(500).json({ message: 'Gagal mengirim notifikasi' });
     }
 });
 

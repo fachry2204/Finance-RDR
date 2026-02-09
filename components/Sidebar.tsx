@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Receipt, FileText, X, PlusCircle, PieChart, Wallet, List, Settings as SettingsIcon, Users } from 'lucide-react';
+import { LayoutDashboard, Receipt, FileText, X, PlusCircle, PieChart, Wallet, List, Settings as SettingsIcon, Users, Bell } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 interface SidebarProps {
@@ -41,6 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       title: 'Lainnya',
       items: [
         { path: '/pegawai', label: 'Data Pegawai', icon: Users },
+        { path: '/notifikasi', label: 'Notifikasi', icon: Bell },
         { path: '/pengaturan', label: 'Pengaturan', icon: SettingsIcon },
       ]
     },

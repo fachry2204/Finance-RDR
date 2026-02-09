@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Pencil, Search, User, Mail, Phone, Briefcase, Lock, Save, X, RefreshCw, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Pencil, Search, User, Mail, Phone, Briefcase, Lock, Save, X, RefreshCw, AlertCircle, Bell } from 'lucide-react';
 import { Employee } from '../types';
 import { API_BASE_URL } from '../utils';
 
@@ -9,6 +10,7 @@ interface EmployeeManagerProps {
 }
 
 const EmployeeManager: React.FC<EmployeeManagerProps> = ({ authToken }) => {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -222,6 +224,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ authToken }) => {
                     {emp.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => navigate(`/notifikasi?userId=${emp.id}`)} className="p-1.5 text-slate-400 hover:text-amber-500 hover:bg-slate-50 rounded" title="Kirim Notifikasi"><Bell size={16}/></button>
                     <button onClick={() => handleOpenEdit(emp)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-50 rounded"><Pencil size={16}/></button>
                     <button onClick={() => handleDelete(emp.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"><Trash2 size={16}/></button>
                     </div>

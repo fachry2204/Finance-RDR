@@ -170,7 +170,7 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
               </div>
            </div>
            
-           <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 flex-1 relative" onClick={onProfileClick}>
+           <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 flex-1 relative" onClick={() => document.getElementById('info-section')?.scrollIntoView({ behavior: 'smooth' })}>
               <p className="text-xs text-blue-100 mb-1">Notifikasi</p>
               <div className="flex items-center gap-1 font-bold">
                  <Bell size={16} /> {notifications.length > 0 ? `${notifications.length} Baru` : '0 Baru'}
@@ -264,13 +264,47 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
          </div>
 
          {/* Announcements / Tasks Placeholder */}
-         <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-100">
+         <div id="info-section" className="bg-white p-5 rounded-2xl shadow-md border border-slate-100">
              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-               <FileText size={18} className="text-amber-500"/> Informasi
+               <Bell size={18} className="text-amber-500"/> Pemberitahuan
             </h3>
-            <div className="p-4 bg-slate-50 rounded-xl text-center text-slate-500 text-sm">
-               <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
-               <p>Belum ada pengumuman atau tugas khusus untuk Anda saat ini.</p>
+            <div className="space-y-3">
+               {notifications.length > 0 ? (
+                   notifications.map((notif, idx) => (
+                       <div key={idx} className={`p-3 rounded-xl border flex gap-3 ${
+                           notif.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-800' :
+                           notif.type === 'error' ? 'bg-red-50 border-red-100 text-red-800' :
+                           notif.type === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-800' :
+                           'bg-blue-50 border-blue-100 text-blue-800'
+                       }`}>
+                           <div className={`mt-0.5 p-1.5 rounded-full shrink-0 ${
+                               notif.type === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                               notif.type === 'error' ? 'bg-red-100 text-red-600' :
+                               notif.type === 'warning' ? 'bg-amber-100 text-amber-600' :
+                               'bg-blue-100 text-blue-600'
+                           }`}>
+                               {notif.type === 'success' ? <FileText size={14} /> : 
+                                notif.type === 'error' ? <LogOut size={14} /> : 
+                                <Bell size={14} />}
+                           </div>
+                           <div>
+                               <p className="text-sm font-medium">{notif.message}</p>
+                               {notif.timestamp && (
+                                   <p className="text-xs opacity-70 mt-1">
+                                       {new Date(notif.timestamp).toLocaleString('id-ID', { 
+                                           day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+                                       })}
+                                   </p>
+                               )}
+                           </div>
+                       </div>
+                   ))
+               ) : (
+                   <div className="p-4 bg-slate-50 rounded-xl text-center text-slate-500 text-sm">
+                       <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
+                       <p>Belum ada pemberitahuan baru.</p>
+                   </div>
+               )}
             </div>
          </div>
 
