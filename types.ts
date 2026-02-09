@@ -80,6 +80,7 @@ export interface Employee {
   email: string;
   username: string;
   password?: string;
+  photo_url?: string;
 }
 
 export interface User {
@@ -88,4 +89,5 @@ export interface User {
   role: string;
   details?: Employee; // For Employee Role
   full_name?: string; // For Admin Role
+  photo_url?: string;
 }
