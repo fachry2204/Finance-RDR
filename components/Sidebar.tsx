@@ -34,6 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
       title: 'Pemasukan',
       items: [
         { path: '/pemasukan/tambah', label: 'Tambah Pemasukan', icon: Wallet },
+        { path: '/pemasukan/laporan', label: 'Laporan Pemasukan', icon: FileText },
         { path: '/pemasukan/statistik', label: 'Statistik Pemasukan', icon: PieChart },
       ]
     },

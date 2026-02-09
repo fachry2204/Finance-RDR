@@ -68,7 +68,8 @@ export interface DatabaseConfig {
 }
 
 export interface AppSettings {
-  categories: string[];
+  categories: string[]; // Expense Categories (kept for backward compatibility/simplicity)
+  incomeCategories: string[]; // New Income Categories
   database: DatabaseConfig;
 }
 

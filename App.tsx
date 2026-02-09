@@ -137,7 +137,8 @@ const App: React.FC = () => {
 
   // --- APP SETTINGS STATE (No LocalStorage) ---
   const [appSettings, setAppSettings] = useState<AppSettings>({
-    categories: [], // Loaded from DB
+    categories: [], // Expense
+    incomeCategories: [], // Income
     database: { host: '', user: '', password: '', name: '', port: '3306', isConnected: false }
   });
 
@@ -165,15 +166,28 @@ const App: React.FC = () => {
           const rmData = await safeFetchJson('/api/reimbursements');
           if (Array.isArray(rmData)) setReimbursements(rmData);
           
-          // 3. Categories from DB (Critical for Sync)
+          // 3. Categories from DB (Now returns array of objects {name, type})
           const catData = await safeFetchJson('/api/categories');
+          let expenseCats: string[] = [];
+          let incomeCats: string[] = [];
+          
+          if (Array.isArray(catData)) {
+            // Check if it's the old string[] format or new object[] format
+            if (typeof catData[0] === 'string') {
+               expenseCats = catData as string[]; // Fallback
+            } else {
+               expenseCats = catData.filter((c: any) => c.type === 'PENGELUARAN').map((c: any) => c.name);
+               incomeCats = catData.filter((c: any) => c.type === 'PEMASUKAN').map((c: any) => c.name);
+            }
+          }
           
           // 4. Other Settings from DB
           const settingsData = await safeFetchJson('/api/settings');
 
           setAppSettings(prev => ({ 
             ...prev, 
-            categories: Array.isArray(catData) ? catData : [],
+            categories: expenseCats,
+            incomeCategories: incomeCats,
             database: { ...prev.database, isConnected: true } 
           }));
         };
@@ -329,16 +343,17 @@ const App: React.FC = () => {
         {currentUser?.role !== 'employee' && (
           <Route element={<AdminLayout />}>
             <Route path="/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="ALL" />} />
-            <Route path="/jurnal" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />} />
-            <Route path="/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} />} />
-            
-            <Route path="/pengeluaran/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="EXPENSE" />} />
-            <Route path="/pengeluaran/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />} />
-            <Route path="/reimburse" element={<ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onDeleteReimbursement={handleDeleteReimbursement} onUpdateReimbursementDetails={handleUpdateReimbursementDetails} onUpdateReimbursement={handleUpdateReimbursementStatus} categories={appSettings.categories} {...commonProps} />} />
-            <Route path="/pengeluaran/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" categories={appSettings.categories} />} />
-            
-            <Route path="/pemasukan/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} {...commonProps} />} />
-            <Route path="/pemasukan/statistik" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="INCOME" />} />
+            <Route path="/jurnal" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
+          <Route path="/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
+          
+          <Route path="/pengeluaran/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="EXPENSE" />} />
+          <Route path="/pengeluaran/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
+          <Route path="/reimburse" element={<ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onDeleteReimbursement={handleDeleteReimbursement} onUpdateReimbursementDetails={handleUpdateReimbursementDetails} onUpdateReimbursement={handleUpdateReimbursementStatus} categories={appSettings.categories} {...commonProps} />} />
+          <Route path="/pengeluaran/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
+          
+          <Route path="/pemasukan/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
+          <Route path="/pemasukan/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PEMASUKAN" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
+          <Route path="/pemasukan/statistik" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="INCOME" />} />
             
             <Route path="/pegawai" element={<EmployeeManager {...commonProps} />} />
             <Route path="/notifikasi" element={<NotificationManager {...commonProps} />} />

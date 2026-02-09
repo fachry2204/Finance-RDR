@@ -13,15 +13,26 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
+// const jwt = require('jsonwebtoken'); // JWT Disabled
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'rdr-secret-key-change-in-prod-999';
+// const JWT_SECRET = process.env.JWT_SECRET || 'rdr-secret-key-change-in-prod-999'; // JWT Disabled
+
+// --- IN-MEMORY TOKEN CACHE ---
+// Format: tokenString -> { userObject, expiresAt }
+// Namun untuk kesederhanaan, kita gunakan Map biasa. Anda bisa menambahkan logika kedaluwarsa jika perlu.
+const tokenCache = new Map();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// DEBUG LOGGER
+app.use((req, res, next) => {
+    console.log(`[DEBUG REQUEST] ${req.method} ${req.url}`);
+    next();
+});
 
 // --- DATABASE CONNECTION CONFIGURATION ---
 // PENTING: Gunakan 127.0.0.1, bukan localhost untuk menghindari isu IPv6 di Node.js
@@ -40,6 +51,41 @@ let pool;
 // Helper: Hash Password (SHA256)
 const hashPassword = (password) => {
     return crypto.createHash('sha256').update(password).digest('hex');
+};
+
+const ensureCategoriesTableSchema = async () => {
+    if (!pool) return;
+    try {
+        // Ensure table exists
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS categories (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                type ENUM('PEMASUKAN', 'PENGELUARAN') NOT NULL DEFAULT 'PENGELUARAN',
+                UNIQUE KEY unique_name_type (name, type)
+            );
+        `);
+
+        // Check if 'type' column exists, if not add it
+        const [columns] = await pool.query("SHOW COLUMNS FROM categories LIKE 'type'");
+        if (columns.length === 0) {
+            console.log('[MIGRATION] Adding type column to categories table...');
+            await pool.query("ALTER TABLE categories ADD COLUMN type ENUM('PEMASUKAN', 'PENGELUARAN') NOT NULL DEFAULT 'PENGELUARAN'");
+            
+            // Drop old unique index on name if exists and add composite unique index
+            try {
+                await pool.query("DROP INDEX name ON categories");
+            } catch (e) { /* Ignore if index doesn't exist */ }
+            
+            try {
+                 await pool.query("ALTER TABLE categories ADD UNIQUE KEY unique_name_type (name, type)");
+            } catch (e) { /* Ignore if already exists */ }
+        }
+
+        console.log('[SUCCESS] Tabel categories terverifikasi.');
+    } catch (error) {
+        console.error('[WARN] Gagal verifikasi tabel categories:', error.message);
+    }
 };
 
 // --- INITIALIZE DATABASE AUTOMATICALLY ---
@@ -98,6 +144,9 @@ const initDatabase = async () => {
 
         // 7. Ensure Notifications Table Exists
         await ensureNotificationsTable();
+        
+        // 8. Ensure Categories Table Schema (Migration)
+        await ensureCategoriesTableSchema();
 
     } catch (err) {
         console.error('\n===================================================');
@@ -105,7 +154,7 @@ const initDatabase = async () => {
         console.error('Error:', err.message);
         console.error('---------------------------------------------------');
         console.error('Solusi:');
-        console.error('1. Pastikan XAMPP (MySQL) sudah di-START.');
+        console.error('1. Pastikan Sudah Aktif.');
         console.error('2. Pastikan password di file .env benar (kosongkan jika default XAMPP).');
         console.error('3. Pastikan port MySQL adalah 3306.');
         console.error('===================================================\n');
@@ -171,6 +220,14 @@ const ensureNotificationsTable = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        
+        // Add target_role column if not exists
+        try {
+            await pool.query("ALTER TABLE notifications ADD COLUMN target_role ENUM('employee', 'admin') DEFAULT 'employee'");
+        } catch (e) {
+            // Ignore error if column already exists
+        }
+
         console.log('[SUCCESS] Tabel notifications terverifikasi.');
     } catch (error) {
         console.error('[WARN] Gagal verifikasi tabel notifications:', error.message);
@@ -208,7 +265,7 @@ const ensureUsersTableSchema = async () => {
 // Jalankan inisialisasi
 initDatabase();
 
-// Middleware: Authenticate Token
+// Middleware: Authenticate Token (USING CACHE)
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     // Format: "Bearer <TOKEN>"
@@ -218,13 +275,13 @@ const authenticateToken = (req, res, next) => {
         return res.status(401).json({ message: 'Akses ditolak. Token tidak ditemukan.' });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.status(403).json({ message: 'Token tidak valid atau kadaluwarsa.' });
-        }
-        req.user = user;
+    // Cek di Cache
+    if (tokenCache.has(token)) {
+        req.user = tokenCache.get(token);
         next();
-    });
+    } else {
+        return res.status(403).json({ message: 'Token tidak valid atau sesi telah berakhir.' });
+    }
 };
 
 // --- FILE UPLOAD STORAGE CONFIGURATION ---
@@ -288,8 +345,14 @@ app.post('/api/login', async (req, res) => {
         
         if (users.length > 0) {
             const user = users[0];
-            const token = jwt.sign({ id: user.id, username: user.username, role: user.role, full_name: user.full_name }, JWT_SECRET, { expiresIn: '24h' });
-            console.log(`[LOGIN SUCCESS] Admin: ${username}`);
+            // GENERATE RANDOM TOKEN
+            const token = crypto.randomBytes(32).toString('hex');
+            const userPayload = { id: user.id, username: user.username, role: user.role, full_name: user.full_name };
+            
+            // SIMPAN KE CACHE
+            tokenCache.set(token, userPayload);
+            
+            console.log(`[LOGIN SUCCESS] Admin: ${username} (Token Cached)`);
             return res.json({ success: true, user: user, token: token });
         } 
 
@@ -298,8 +361,14 @@ app.post('/api/login', async (req, res) => {
         
         if (employees.length > 0) {
             const emp = employees[0];
-            const token = jwt.sign({ id: emp.id, username: emp.username, role: 'employee', name: emp.name }, JWT_SECRET, { expiresIn: '24h' });
-            console.log(`[LOGIN SUCCESS] Employee: ${username}`);
+            // GENERATE RANDOM TOKEN
+            const token = crypto.randomBytes(32).toString('hex');
+            const userPayload = { id: emp.id, username: emp.username, role: 'employee', name: emp.name };
+            
+            // SIMPAN KE CACHE
+            tokenCache.set(token, userPayload);
+            
+            console.log(`[LOGIN SUCCESS] Employee: ${username} (Token Cached)`);
             
             const userObj = {
                 id: emp.id,
@@ -318,6 +387,19 @@ app.post('/api/login', async (req, res) => {
         console.error(`[LOGIN ERROR]`, error);
         res.status(500).json({ success: false, message: 'Server error: ' + error.message });
     }
+});
+
+// Logout Route (Remove Token from Cache)
+app.post('/api/logout', (req, res) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (token && tokenCache.has(token)) {
+        tokenCache.delete(token);
+        console.log('[LOGOUT] Token removed from cache.');
+    }
+    
+    res.json({ success: true, message: 'Logged out successfully' });
 });
 
 // --- PROFILE API ---
@@ -422,9 +504,16 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
 // --- CATEGORIES API ---
 app.get('/api/categories', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    const { type } = req.query;
     try {
-        const [rows] = await pool.query('SELECT name FROM categories ORDER BY name ASC');
-        res.json(rows.map(r => r.name));
+        let query = 'SELECT name, type FROM categories ORDER BY name ASC';
+        let params = [];
+        if (type) {
+            query = 'SELECT name, type FROM categories WHERE type = ? ORDER BY name ASC';
+            params = [type];
+        }
+        const [rows] = await pool.query(query, params);
+        res.json(rows);
     } catch (error) {
         console.error('[API ERROR] Fetch categories failed:', error);
         res.status(500).json({ message: 'Failed to fetch categories' });
@@ -433,12 +522,20 @@ app.get('/api/categories', authenticateToken, async (req, res) => {
 
 app.post('/api/categories', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
-    const { name } = req.body;
+    const { name, type } = req.body;
+    
+    if (!name) return res.status(400).json({ message: 'Name required' });
+    
+    const categoryType = type || 'PENGELUARAN';
+
     try {
-        await pool.query('INSERT INTO categories (name) VALUES (?)', [name]);
+        await pool.query('INSERT INTO categories (name, type) VALUES (?, ?)', [name, categoryType]);
         res.json({ success: true, message: 'Category added' });
     } catch (error) {
         console.error('[API ERROR] Add category failed:', error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ success: false, message: 'Kategori sudah ada untuk tipe ini' });
+        }
         res.status(500).json({ success: false, message: 'Failed to add category' });
     }
 });
@@ -446,8 +543,18 @@ app.post('/api/categories', authenticateToken, async (req, res) => {
 app.delete('/api/categories/:name', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     const { name } = req.params;
+    const { type } = req.query;
+
     try {
-        await pool.query('DELETE FROM categories WHERE name = ?', [name]);
+        let query = 'DELETE FROM categories WHERE name = ?';
+        let params = [name];
+        
+        if (type) {
+            query += ' AND type = ?';
+            params.push(type);
+        }
+
+        await pool.query(query, params);
         res.json({ success: true, message: 'Category deleted' });
     } catch (error) {
         console.error('[API ERROR] Delete category failed:', error);
@@ -459,7 +566,7 @@ app.delete('/api/categories/:name', authenticateToken, async (req, res) => {
 app.get('/api/users', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     try {
-        const [rows] = await pool.query('SELECT id, username, role FROM users');
+        const [rows] = await pool.query('SELECT id, username, role, full_name FROM users');
         res.json(rows);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch users' });
@@ -763,6 +870,17 @@ app.post('/api/reimbursements', authenticateToken, async (req, res) => {
         }
 
         await conn.commit();
+
+        // Create Notification for Admin
+        try {
+            await pool.query(
+                "INSERT INTO notifications (message, type, target_role, created_by) VALUES (?, 'info', 'admin', ?)",
+                [`Pengajuan Baru: ${requestorName} - ${r.activityName} (${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(r.grandTotal)})`, req.user.id]
+            );
+        } catch (notifErr) {
+            console.error('[WARN] Failed to create admin notification:', notifErr);
+        }
+
         res.json({ status: 'success', message: 'Reimbursement saved' });
     } catch (error) {
         await conn.rollback();
@@ -911,31 +1029,10 @@ app.put('/api/reimbursements/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Serve Static Frontend & Uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-const publicPath = path.join(__dirname, 'public');
-
-if (fs.existsSync(publicPath)) {
-    console.log(`[INFO] Serving static files from: ${publicPath}`);
-    app.use(express.static(publicPath));
-    app.get('*', (req, res) => {
-        if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/uploads')) {
-            return res.status(404).json({ message: 'Not Found' });
-        }
-        res.sendFile(path.join(publicPath, 'index.html'));
-    });
-} else {
-    app.get('/', (req, res) => res.send('Server Running. Please run npm run build inside root directory.'));
-}
+// Serve Static Frontend & Uploads MOVED TO BOTTOM
 
 // --- NOTIFICATIONS API ---
-app.get('/api/test-db', (req, res) => {
-    if (pool) {
-        res.json({ status: 'success', message: 'Database connected' });
-    } else {
-        res.status(500).json({ status: 'error', message: 'Database not connected' });
-    }
-});
+// Duplicate test-db removed
 
 app.get('/api/notifications', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
@@ -949,22 +1046,26 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
         let notifications = [];
 
         if (role === 'admin') {
-            // Admin: Count PENDING reimbursements
-            const [rows] = await pool.query("SELECT COUNT(*) as count FROM reimbursements WHERE status = 'PENDING'");
-            count = rows[0].count;
+            // Admin: Fetch notifications from DB (target_role = 'admin')
+            const [rows] = await pool.query(
+                "SELECT * FROM notifications WHERE target_role = 'admin' ORDER BY created_at DESC LIMIT 50"
+            );
             
-            if (count > 0) {
-                notifications.push({
-                    id: 'admin-pending',
-                    message: `${count} Pengajuan Menunggu Persetujuan`,
-                    type: 'info'
-                });
-            }
+            notifications = rows.map(n => ({
+                id: n.id,
+                message: n.message,
+                type: n.type,
+                is_read: n.is_read,
+                timestamp: n.created_at
+            }));
+
+            // Count unread
+            count = notifications.filter(n => !n.is_read).length;
         } else {
             // Employee: 
             // 1. Manual Notifications (Targeted or Broadcast)
             const [manualNotifs] = await pool.query(
-                "SELECT * FROM notifications WHERE (user_id = ? OR user_id IS NULL) ORDER BY created_at DESC LIMIT 20", 
+                "SELECT * FROM notifications WHERE (user_id = ? OR (user_id IS NULL AND target_role = 'employee')) ORDER BY created_at DESC LIMIT 20", 
                 [userId]
             );
 
@@ -997,6 +1098,40 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('[API ERROR] Get notifications failed:', error);
         res.status(500).json({ message: 'Gagal mengambil notifikasi' });
+    }
+});
+
+// Mark All Read (Admin)
+app.put('/api/notifications/read-all', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    try {
+        await pool.query("UPDATE notifications SET is_read = TRUE WHERE target_role = 'admin'");
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[API ERROR] Mark all read failed:', error);
+        res.status(500).json({ message: 'Gagal update status notifikasi' });
+    }
+});
+
+// Clear All Notifications (Admin)
+app.delete('/api/notifications/clear-all', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    try {
+        await pool.query("DELETE FROM notifications WHERE target_role = 'admin'");
+        res.json({ success: true });
+    } catch (error) {
+        console.error('[API ERROR] Clear all notifications failed:', error);
+        res.status(500).json({ message: 'Gagal menghapus notifikasi' });
     }
 });
 
@@ -1070,6 +1205,23 @@ app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Gagal menghapus notifikasi' });
     }
 });
+
+// Serve Static Frontend & Uploads (MUST BE LAST)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const publicPath = path.join(__dirname, 'public');
+
+if (fs.existsSync(publicPath)) {
+    console.log(`[INFO] Serving static files from: ${publicPath}`);
+    app.use(express.static(publicPath));
+    app.get('*', (req, res) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path.startsWith('/uploads')) {
+            return res.status(404).json({ message: 'Not Found' });
+        }
+        res.sendFile(path.join(publicPath, 'index.html'));
+    });
+} else {
+    app.get('/', (req, res) => res.send('Server Running. Please run npm run build inside root directory.'));
+}
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

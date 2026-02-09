@@ -8,10 +8,11 @@ interface ReportProps {
   transactions: Transaction[];
   reimbursements: Reimbursement[];
   fixedFilterType?: string; // If present, locks the filter dropdown
-  categories: string[]; // Added categories prop
+  categories: string[]; // Expense
+  incomeCategories?: string[]; // Income
 }
 
-const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilterType, categories }) => {
+const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilterType, categories, incomeCategories = [] }) => {
   const [filterType, setFilterType] = useState<string>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -20,6 +21,13 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
   
   // State khusus untuk memfilter sub-jenis pengeluaran (Cash vs Reimburse)
   const [expenseSubFilter, setExpenseSubFilter] = useState<'ALL' | 'NORMAL' | 'REIMBURSE'>('ALL');
+
+  // Determine active categories for dropdown
+  const activeCategoryList = useMemo(() => {
+    if (filterType === 'PEMASUKAN') return incomeCategories;
+    if (filterType === 'PENGELUARAN') return categories;
+    return [...new Set([...categories, ...incomeCategories])]; // Combine for ALL
+  }, [filterType, categories, incomeCategories]);
 
   // Handle fixed filter
   useEffect(() => {
@@ -125,7 +133,8 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
   };
 
   const getPageTitle = () => {
-    if (fixedFilterType === 'PENGELUARAN') return 'Laporan Pengeluaran (Cash Out)';
+    if (fixedFilterType === 'PENGELUARAN') return 'Laporan Pengeluaran';
+    if (fixedFilterType === 'PEMASUKAN') return 'Laporan Pemasukan';
     return 'Laporan Keuangan';
   }
 
@@ -216,8 +225,8 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
                 onChange={e => setExpenseSubFilter(e.target.value as any)} 
                 className="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg text-sm outline-none focus:border-blue-500"
             >
-              <option value="ALL">Semua (Cash & Reimburse)</option>
-              <option value="NORMAL">Pengeluaran (Cash/Tunai)</option>
+              <option value="ALL">Semua (Umum & Reimburse)</option>
+              <option value="NORMAL">Pengeluaran Umum</option>
               <option value="REIMBURSE">Reimburse (Ganti Uang)</option>
             </select>
           </div>
@@ -233,7 +242,7 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
                 className="w-full p-2 pl-8 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg text-sm outline-none focus:border-blue-500 appearance-none"
              >
                 <option value="">Semua Kategori</option>
-                {categories.map((cat, idx) => (
+                {activeCategoryList.map((cat, idx) => (
                   <option key={idx} value={cat}>{cat}</option>
                 ))}
              </select>
@@ -253,7 +262,7 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
         {(!fixedFilterType || fixedFilterType === 'PENGELUARAN') && (
           <>
             <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-lg border border-rose-100 dark:border-rose-800">
-              <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold uppercase">Total Pengeluaran (Cash)</p>
+              <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold uppercase">Total Pengeluaran Umum</p>
               <p className="text-xl font-bold text-rose-700 dark:text-rose-300">{formatCurrency(summary.expense - summary.reimburse)}</p>
             </div>
             <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-100 dark:border-amber-800">
@@ -261,7 +270,7 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
               <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(summary.reimburse)}</p>
             </div>
             <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-600">
-               <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase">Total Cash Out</p>
+               <p className="text-xs text-slate-600 dark:text-slate-400 font-semibold uppercase">Total Pengeluaran</p>
                <p className="text-xl font-bold text-slate-700 dark:text-slate-200">{formatCurrency(summary.expense)}</p>
              </div>
           </>
@@ -313,7 +322,7 @@ const Report: React.FC<ReportProps> = ({ transactions, reimbursements, fixedFilt
                         )}
                         {d.subType === 'NORMAL' && d.type === 'PENGELUARAN' && (
                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
-                             TUNAI
+                             UMUM
                            </span>
                         )}
                       </div>

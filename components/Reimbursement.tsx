@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Reimbursement, ItemDetail, ReimbursementStatus } from '../types';
-import { generateId, formatCurrency, formatDate } from '../utils';
+import { generateId, formatCurrency, formatDate, API_BASE_URL } from '../utils';
 import { Plus, Save, UploadCloud, Trash2, User, FileText, Eye, X, CheckCircle, XCircle, Clock, Loader, AlertCircle, Lock, Pencil, Check } from 'lucide-react';
 
 interface ReimbursementProps {
@@ -50,6 +50,52 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
 
   // Image Preview Modal State
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Employee List State (for Admin dropdown)
+  const [employeeList, setEmployeeList] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Only fetch if NOT employee view AND we have a valid token
+    if (!isEmployeeView && authToken) {
+      console.log("Fetching employees and admins for dropdown...");
+      
+      const fetchData = async () => {
+        try {
+          const [empRes, userRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/api/employees`, { headers: { 'Authorization': `Bearer ${authToken}` } }),
+            fetch(`${API_BASE_URL}/api/users`, { headers: { 'Authorization': `Bearer ${authToken}` } })
+          ]);
+
+          const employees = await empRes.json();
+          const users = await userRes.json(); // Admins
+
+          let combinedList: any[] = [];
+
+          if (Array.isArray(employees)) {
+            combinedList = [...employees];
+          }
+
+          if (Array.isArray(users)) {
+            // Filter admins and map to common structure
+            const admins = users.map((u: any) => ({
+              id: `admin-${u.id}`,
+              name: u.full_name || u.username,
+              is_admin: true
+            }));
+            combinedList = [...combinedList, ...admins];
+          }
+
+          console.log("Combined requestor list:", combinedList);
+          setEmployeeList(combinedList);
+
+        } catch (err) {
+          console.error("Gagal memuat data pegawai/admin:", err);
+        }
+      };
+
+      fetchData();
+    }
+  }, [isEmployeeView, authToken]);
 
   const addItem = () => {
     const newId = generateId();
@@ -335,16 +381,32 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nama Pengaju</label>
               <div className="relative">
-                <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="Nama Lengkap" 
-                  value={requestorName} 
-                  onChange={e => setRequestorName(e.target.value)} 
-                  className={`w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 pl-10 focus:ring-blue-500 outline-none transition-colors ${isEmployeeView ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
-                  readOnly={isEmployeeView}
-                />
+                <User className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" size={18} />
+                
+                {isEmployeeView ? (
+                   <input 
+                    type="text" 
+                    required 
+                    placeholder="Nama Lengkap" 
+                    value={requestorName} 
+                    onChange={e => setRequestorName(e.target.value)} 
+                    className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-600 text-slate-500 dark:text-slate-400 border p-2.5 pl-10 cursor-not-allowed outline-none transition-colors"
+                    readOnly
+                  />
+                ) : (
+                  <select
+                    required
+                    value={requestorName}
+                    onChange={e => setRequestorName(e.target.value)}
+                    className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 pl-10 focus:ring-blue-500 outline-none transition-colors"
+                  >
+                    <option value="" disabled>Pilih Nama Pegawai</option>
+                    {employeeList.map((emp) => (
+                      <option key={emp.id} value={emp.name}>{emp.name}</option>
+                    ))}
+                    <option value="Admin">Admin / Kantor</option>
+                  </select>
+                )}
               </div>
             </div>
             <div>

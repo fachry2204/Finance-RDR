@@ -13,6 +13,7 @@ interface JournalProps {
   filterType?: TransactionType;
   initialView?: 'LIST' | 'FORM';
   categories: string[];
+  incomeCategories?: string[];
   authToken: string | null;
 }
 
@@ -25,6 +26,7 @@ const Journal: React.FC<JournalProps> = ({
   filterType,
   initialView = 'LIST',
   categories,
+  incomeCategories = [],
   authToken
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>(initialView);
@@ -63,6 +65,8 @@ const Journal: React.FC<JournalProps> = ({
     if (!filterType) return transactions;
     return transactions.filter(t => t.type === filterType);
   }, [transactions, filterType]);
+
+  const activeCategories = type === 'PEMASUKAN' ? incomeCategories : categories;
 
   // Add Item
   const addItem = () => {
@@ -338,7 +342,7 @@ const Journal: React.FC<JournalProps> = ({
                 className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
               >
                 <option value="" disabled>Pilih Kategori</option>
-                {categories.map((cat, idx) => (
+                {activeCategories.map((cat, idx) => (
                   <option key={idx} value={cat}>{cat}</option>
                 ))}
               </select>

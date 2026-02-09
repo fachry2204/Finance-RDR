@@ -15,6 +15,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
   
   // Local state
   const [newCategory, setNewCategory] = useState('');
+  const [activeCategoryType, setActiveCategoryType] = useState<'PENGELUARAN' | 'PEMASUKAN'>('PENGELUARAN');
   const [dbConfig, setDbConfig] = useState<DatabaseConfig>(settings.database);
   
   // User Management State
@@ -51,7 +52,14 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     const catName = newCategory.trim();
-    if (!catName || settings.categories.includes(catName)) return;
+    
+    // Check duplicates based on active type
+    const currentList = activeCategoryType === 'PENGELUARAN' ? settings.categories : settings.incomeCategories;
+    
+    if (!catName || currentList.includes(catName)) {
+        if(currentList.includes(catName)) alert("Kategori sudah ada di daftar ini");
+        return;
+    }
 
     if (authToken) {
        setCategoryLoading(true);
@@ -62,7 +70,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
                  'Content-Type': 'application/json',
                  'Authorization': `Bearer ${authToken}` 
               },
-              body: JSON.stringify({ name: catName })
+              body: JSON.stringify({ name: catName, type: activeCategoryType })
           });
           const data = await res.json();
           if (!data.success) {
@@ -79,19 +87,26 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
     }
 
     // Update local state immediately after success
-    onUpdateSettings({
-      ...settings,
-      categories: [...settings.categories, catName]
-    });
+    if (activeCategoryType === 'PENGELUARAN') {
+        onUpdateSettings({
+            ...settings,
+            categories: [...settings.categories, catName]
+        });
+    } else {
+        onUpdateSettings({
+            ...settings,
+            incomeCategories: [...(settings.incomeCategories || []), catName]
+        });
+    }
     setNewCategory('');
   };
 
   const handleDeleteCategory = async (cat: string) => {
-    if (!confirm(`Hapus kategori "${cat}"?`)) return;
+    if (!confirm(`Hapus kategori "${cat}" dari ${activeCategoryType}?`)) return;
 
     if (authToken) {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(cat)}`, {
+            const res = await fetch(`${API_BASE_URL}/api/categories/${encodeURIComponent(cat)}?type=${activeCategoryType}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${authToken}` }
             });
@@ -106,10 +121,17 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
         }
     }
 
-    onUpdateSettings({
-      ...settings,
-      categories: settings.categories.filter(c => c !== cat)
-    });
+    if (activeCategoryType === 'PENGELUARAN') {
+        onUpdateSettings({
+            ...settings,
+            categories: settings.categories.filter(c => c !== cat)
+        });
+    } else {
+        onUpdateSettings({
+            ...settings,
+            incomeCategories: (settings.incomeCategories || []).filter(c => c !== cat)
+        });
+    }
   };
 
   // --- User Handlers ---
@@ -225,10 +247,34 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
                 </div>
               </div>
 
+              {/* Type Switcher */}
+              <div className="flex gap-2 mb-4">
+                  <button
+                      onClick={() => setActiveCategoryType('PENGELUARAN')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          activeCategoryType === 'PENGELUARAN' 
+                          ? 'bg-red-100 text-red-700 ring-2 ring-red-500 ring-offset-1' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                  >
+                      Pengeluaran
+                  </button>
+                  <button
+                      onClick={() => setActiveCategoryType('PEMASUKAN')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          activeCategoryType === 'PEMASUKAN' 
+                          ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500 ring-offset-1' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                  >
+                      Pemasukan
+                  </button>
+              </div>
+
               <form onSubmit={handleAddCategory} className="flex gap-2 mb-6">
                 <input 
                   type="text" 
-                  placeholder="Nama Kategori Baru..." 
+                  placeholder={`Nama Kategori ${activeCategoryType === 'PENGELUARAN' ? 'Pengeluaran' : 'Pemasukan'}...`} 
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="flex-1 rounded-lg border-slate-300 bg-slate-50 text-slate-900 border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -244,12 +290,15 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
               </form>
 
               <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                {settings.categories.map((cat, index) => (
+                {(activeCategoryType === 'PENGELUARAN' ? settings.categories : (settings.incomeCategories || [])).map((cat, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 group hover:border-blue-200 transition-colors">
                     <span className="text-slate-700 font-medium">{cat}</span>
                     <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-rose-500 p-1"><Trash2 size={16} /></button>
                   </div>
                 ))}
+                {(activeCategoryType === 'PENGELUARAN' ? settings.categories : (settings.incomeCategories || [])).length === 0 && (
+                   <p className="text-center text-slate-400 py-4 italic">Belum ada kategori {activeCategoryType.toLowerCase()}.</p>
+                )}
               </div>
             </div>
           )}
