@@ -1,8 +1,8 @@
 
-import React from 'react';
-import { LogOut, User as UserIcon, Calendar, Database } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LogOut, User as UserIcon, Calendar, Database, Bell } from 'lucide-react';
 import { User } from '../types';
-import { getCurrentDateFormatted } from '../utils';
+import { getCurrentDateFormatted, API_BASE_URL } from '../utils';
 
 interface HeaderProps {
   user: User | null;
@@ -13,6 +13,29 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isDbConnected, onProfileClick }) => {
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  useEffect(() => {
+    // Only fetch for admin here, as employee has their own dashboard notifications
+    if (user?.role === 'admin') {
+      fetchNotifications();
+    }
+  }, [user]);
+
+  const fetchNotifications = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+             headers: { 'Authorization': `Bearer ${localStorage.getItem('rdr_token')}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            setNotificationCount(data.count);
+        }
+    } catch (e) {
+        console.error("Failed to fetch admin notifications");
+    }
+  };
+
   return (
     <header className="h-16 bg-white border-b border-slate-200 fixed top-0 left-0 right-0 z-40 px-4 md:px-6 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
@@ -43,12 +66,26 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
            </span>
         </div>
 
+        {/* Admin Notification Bell */}
+        {user?.role === 'admin' && (
+             <div className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-lg cursor-pointer">
+                 <Bell size={20} />
+                 {notificationCount > 0 && (
+                     <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                 )}
+             </div>
+        )}
+
         <button 
           onClick={onProfileClick}
           className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-100 transition-colors cursor-pointer group"
         >
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-            <UserIcon size={16} />
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors overflow-hidden">
+            {user?.photo_url ? (
+                <img src={`${API_BASE_URL}${user.photo_url}`} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+                <UserIcon size={16} />
+            )}
           </div>
           <div className="hidden md:block pr-2 text-left">
             <p className="text-sm font-semibold text-slate-700 group-hover:text-blue-700 transition-colors">{user?.role === 'employee' ? user.details?.name : (user?.full_name || user?.username || 'Admin')}</p>

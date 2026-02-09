@@ -136,9 +136,18 @@ const ensureEmployeesTable = async () => {
                 email VARCHAR(100),
                 username VARCHAR(50) NOT NULL UNIQUE,
                 password VARCHAR(255) NOT NULL,
+                photo_url TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
+        
+        // Add photo_url column if not exists
+        try {
+            await pool.query("ALTER TABLE employees ADD COLUMN photo_url TEXT");
+        } catch (e) {
+            // Ignore if column already exists
+        }
+
         console.log('[SUCCESS] Tabel employees terverifikasi.');
     } catch (error) {
         console.error('[WARN] Gagal verifikasi tabel employees:', error.message);
@@ -148,14 +157,28 @@ const ensureEmployeesTable = async () => {
 const ensureUsersTableSchema = async () => {
     if (!pool) return;
     try {
-        // Check if full_name column exists
-        const [columns] = await pool.query("SHOW COLUMNS FROM users LIKE 'full_name'");
-        if (columns.length === 0) {
-            await pool.query("ALTER TABLE users ADD COLUMN full_name VARCHAR(100) AFTER username");
-            console.log("[INFO] Added full_name column to users table.");
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL,
+                role ENUM('admin', 'employee') NOT NULL DEFAULT 'employee',
+                full_name VARCHAR(100),
+                photo_url TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        
+        // Add photo_url column if not exists (for existing tables)
+        try {
+            await pool.query("ALTER TABLE users ADD COLUMN photo_url TEXT");
+        } catch (e) {
+            // Ignore if column already exists
         }
-    } catch (e) {
-        console.warn("[WARN] Failed to update users table schema:", e.message);
+
+        console.log('[SUCCESS] Tabel users terverifikasi.');
+    } catch (error) {
+        console.error('[WARN] Gagal verifikasi tabel users:', error.message);
     }
 };
 
@@ -201,6 +224,15 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // --- API ROUTES ---
+
+// Upload Route
+app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ status: 'error', message: 'No file uploaded' });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ status: 'success', url: fileUrl });
+});
 
 // Public Route
 app.get('/api/test-db', async (req, res) => {
@@ -308,13 +340,16 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
 
         await pool.query(query, params);
         
-        // Return updated user info (minus password)
+        // Return updated user info
         const updatedUser = { ...req.user };
+        const { photoUrl } = req.body;
+
         if (role === 'employee') {
             updatedUser.name = fullName;
-            // Also update details if present in session logic (but here we just return success and client refetches or updates state)
+            if (photoUrl !== undefined) updatedUser.photo_url = photoUrl;
         } else {
             updatedUser.full_name = fullName;
+            if (photoUrl !== undefined) updatedUser.photo_url = photoUrl;
         }
 
         res.json({ success: true, message: 'Profil berhasil diperbarui', user: updatedUser });
@@ -825,6 +860,65 @@ if (fs.existsSync(publicPath)) {
 } else {
     app.get('/', (req, res) => res.send('Server Running. Please run npm run build inside root directory.'));
 }
+
+// --- NOTIFICATIONS API ---
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    
+    const userId = req.user.id;
+    const role = req.user.role;
+    const requestorName = req.user.name || req.user.full_name || req.user.username;
+
+    try {
+        let count = 0;
+        let notifications = [];
+
+        if (role === 'admin') {
+            // Admin: Count PENDING reimbursements
+            const [rows] = await pool.query("SELECT COUNT(*) as count FROM reimbursements WHERE status = 'PENDING'");
+            count = rows[0].count;
+            
+            if (count > 0) {
+                notifications.push({
+                    id: 'admin-pending',
+                    message: `${count} Pengajuan Menunggu Persetujuan`,
+                    type: 'info'
+                });
+            }
+        } else {
+            // Employee: Count recent updates (DITOLAK/BERHASIL) or PENDING
+            // For simplicity: Show pending count and recent processed
+            const [pendingRows] = await pool.query("SELECT COUNT(*) as count FROM reimbursements WHERE requestor_name = ? AND status = 'PENDING'", [requestorName]);
+            const pendingCount = pendingRows[0].count;
+
+            const [recentRows] = await pool.query("SELECT * FROM reimbursements WHERE requestor_name = ? AND status IN ('DITOLAK', 'BERHASIL') ORDER BY timestamp DESC LIMIT 3", [requestorName]);
+            
+            if (pendingCount > 0) {
+                 notifications.push({
+                    id: 'emp-pending',
+                    message: `${pendingCount} Pengajuan Sedang Diproses`,
+                    type: 'info'
+                });
+            }
+
+            recentRows.forEach(r => {
+                notifications.push({
+                    id: `emp-status-${r.id}`,
+                    message: `Pengajuan ${r.activity_name} ${r.status === 'BERHASIL' ? 'Disetujui' : 'Ditolak'}`,
+                    type: r.status === 'BERHASIL' ? 'success' : 'error'
+                });
+            });
+            
+            count = notifications.length;
+        }
+
+        res.json({ count, notifications });
+
+    } catch (error) {
+        console.error('[API ERROR] Get notifications failed:', error);
+        res.status(500).json({ message: 'Gagal mengambil notifikasi' });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

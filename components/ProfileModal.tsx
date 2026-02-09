@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { User, Lock, Save, X, Eye, EyeOff } from 'lucide-react';
 import { User as UserType } from '../types';
+import { API_BASE_URL } from '../utils';
 
 interface ProfileModalProps {
     user: UserType;
     isOpen: boolean;
     onClose: () => void;
-    onUpdateProfile: (fullName: string, password?: string) => Promise<void>;
+    onUpdateProfile: (fullName: string, password?: string, photoUrl?: string) => Promise<void>;
 }
 
 const ProfileModal: React.FC<ProfileModalProps> = ({ user, isOpen, onClose, onUpdateProfile }) => {
@@ -16,6 +17,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, isOpen, onClose, onUp
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const [photoUrl, setPhotoUrl] = useState('');
+    const [uploading, setUploading] = useState(false);
+
     useEffect(() => {
         if (isOpen && user) {
             // Priority: Employee name -> Admin full_name -> Username
@@ -23,10 +27,41 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, isOpen, onClose, onUp
             setFullName(currentName || '');
             setPassword('');
             setConfirmPassword('');
+            setPhotoUrl(user.photo_url || '');
         }
     }, [isOpen, user]);
 
     if (!isOpen) return null;
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setUploading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('rdr_token')}` // Fixed key
+                },
+                body: formData
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                setPhotoUrl(data.url);
+            } else {
+                alert('Gagal upload foto: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Gagal upload foto');
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -38,7 +73,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, isOpen, onClose, onUp
 
         setIsSubmitting(true);
         try {
-            await onUpdateProfile(fullName, password);
+            await onUpdateProfile(fullName, password, photoUrl);
             onClose();
         } catch (error) {
             console.error(error);
@@ -60,6 +95,22 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, isOpen, onClose, onUp
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {/* Photo Upload */}
+                    <div className="flex flex-col items-center mb-4">
+                        <div className="w-24 h-24 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden mb-2 relative group">
+                            {photoUrl ? (
+                                <img src={`${API_BASE_URL}${photoUrl}`} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <User size={40} className="text-slate-400" />
+                            )}
+                            <label className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                                <span className="text-white text-xs">Ubah Foto</span>
+                                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                            </label>
+                        </div>
+                        {uploading && <p className="text-xs text-blue-500">Mengupload...</p>}
+                    </div>
+
                     {/* Read Only Fields */}
                     <div>
                         <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Username</label>

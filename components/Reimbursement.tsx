@@ -481,8 +481,8 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
         </form>
       ) : (
         <>
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors">
-            <table className="w-full text-left">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors overflow-x-auto">
+            <table className="w-full text-left min-w-[800px] md:min-w-full">
               <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Tanggal</th>

@@ -16,10 +16,27 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
   const employeeDetails = user.details;
   const [view, setView] = useState<'DASHBOARD' | 'REIMBURSEMENT'>('DASHBOARD');
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   useEffect(() => {
     fetchReimbursements();
+    fetchNotifications();
   }, [authToken]);
+
+  const fetchNotifications = async () => {
+    if (!authToken) return;
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            setNotifications(data.notifications);
+        }
+    } catch (error) {
+        console.error("Failed to fetch notifications", error);
+    }
+  };
 
   const fetchReimbursements = async () => {
     if (!authToken) return;
@@ -123,7 +140,12 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
            <Briefcase size={120} />
         </div>
         
-        <div className="flex justify-between items-start mb-6 relative z-10">
+        {/* Logo */}
+        <div className="absolute top-6 left-6 z-20">
+           <img src="https://ruangdimensirecords.com/img/logo.png" alt="Logo" className="h-8 w-auto brightness-0 invert" />
+        </div>
+
+        <div className="flex justify-between items-start mb-6 relative z-10 pt-8">
            <div>
               <p className="text-blue-100 text-sm mb-1">{getCurrentDateFormatted()}</p>
               <h1 className="text-2xl font-bold">Halo, {employeeDetails?.name || user.username}</h1>
@@ -136,69 +158,89 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
 
         {/* Quick Stats / Highlights */}
         <div className="flex gap-4 relative z-10">
-           <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 flex-1">
+            {/* Info Card moved here as requested */}
+            <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 flex-1">
               <p className="text-xs text-blue-100 mb-1">Status</p>
               <div className="flex items-center gap-1 font-bold">
                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div> Aktif
               </div>
            </div>
-           <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 flex-1">
+           
+           <div className="bg-white/20 backdrop-blur-md rounded-xl p-3 flex-1 relative" onClick={onProfileClick}>
               <p className="text-xs text-blue-100 mb-1">Notifikasi</p>
               <div className="flex items-center gap-1 font-bold">
-                 <Bell size={14} /> 0 Baru
+                 <Bell size={16} /> {notifications.length > 0 ? `${notifications.length} Baru` : '0 Baru'}
               </div>
+              {notifications.length > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>
+              )}
            </div>
         </div>
       </div>
 
-      <div className="px-4 -mt-8 relative z-20 space-y-6">
-         
-         {/* Menu Grid */}
-         <div className="grid grid-cols-2 gap-4">
-             <button 
-                onClick={() => setView('REIMBURSEMENT')}
-                className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-blue-50 transition-colors group"
-             >
-                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <DollarSign size={24} />
-                </div>
-                <span className="font-semibold text-slate-700 group-hover:text-blue-700">Reimbursement</span>
-             </button>
-
-             <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center gap-3 opacity-50 cursor-not-allowed">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                    <Calendar size={24} />
-                </div>
-                <span className="font-semibold text-slate-400">Absensi</span>
-             </div>
-         </div>
-
-         {/* Profile Card */}
-         <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 relative group">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                   <User size={18} className="text-blue-600"/> Data Diri
-                </h3>
-                <button 
-                    onClick={onProfileClick}
-                    className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
-                >
-                    Edit Profil
-                </button>
+      <div className="p-6 -mt-6 relative z-10 space-y-6">
+        
+        {/* Profile Card (Now below info) */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow" onClick={onProfileClick}>
+            <div className="w-16 h-16 rounded-full bg-slate-100 overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
+                {user.photo_url ? (
+                    <img src={`http://localhost:5000${user.photo_url}`} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                        <User size={32} />
+                    </div>
+                )}
             </div>
-            <div className="space-y-3">
-               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                     <Briefcase size={18} />
-                  </div>
-                  <div>
-                     <p className="text-xs text-slate-500">Jabatan</p>
-                     <p className="font-medium text-slate-800">{employeeDetails?.position || '-'}</p>
-                  </div>
+            <div className="flex-1">
+                <h2 className="font-bold text-slate-800">{employeeDetails?.name || user.username}</h2>
+                <p className="text-sm text-slate-500">{employeeDetails?.position || 'Employee'}</p>
+                <p className="text-xs text-blue-600 mt-1">Edit Profil & Upload Foto</p>
+            </div>
+            <div className="bg-slate-50 p-2 rounded-full text-slate-400">
+                <User size={20} />
+            </div>
+        </div>
+
+        {/* Menu Grid */}
+        <div className="grid grid-cols-2 gap-4">
+            <button 
+               onClick={() => setView('REIMBURSEMENT')}
+               className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center gap-3 hover:bg-blue-50 transition-colors group"
+            >
+               <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                   <DollarSign size={24} />
                </div>
-               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                     <Phone size={18} />
+               <span className="font-semibold text-slate-700 group-hover:text-blue-700">Reimbursement</span>
+            </button>
+
+            <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-col items-center justify-center gap-3 opacity-50 cursor-not-allowed">
+               <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                   <Calendar size={24} />
+               </div>
+               <span className="font-semibold text-slate-400">Absensi</span>
+            </div>
+        </div>
+
+        {/* Detailed Info (Was Profile Card) */}
+        <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 relative group">
+           <div className="flex justify-between items-center mb-4">
+               <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                  <User size={18} className="text-blue-600"/> Data Diri
+               </h3>
+           </div>
+           <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <Briefcase size={18} />
+                 </div>
+                 <div>
+                    <p className="text-xs text-slate-500">Jabatan</p>
+                    <p className="font-medium text-slate-800">{employeeDetails?.position || '-'}</p>
+                 </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                 <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <Phone size={18} />
                   </div>
                   <div>
                      <p className="text-xs text-slate-500">Telepon / WhatsApp</p>

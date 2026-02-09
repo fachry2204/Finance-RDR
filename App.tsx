@@ -89,11 +89,11 @@ const App: React.FC = () => {
   };
 
   // --- PROFILE HANDLERS ---
-  const handleUpdateProfile = async (fullName: string, password?: string) => {
+  const handleUpdateProfile = async (fullName: string, password?: string, photoUrl?: string) => {
       const response = await authFetch('/api/profile', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fullName, password })
+          body: JSON.stringify({ fullName, password, photoUrl })
       });
 
       if (response && response.ok) {
