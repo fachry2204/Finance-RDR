@@ -91,6 +91,7 @@ const initDatabase = async () => {
 
         // 5. Pastikan User Admin Ada (Fallback jika schema.sql gagal seed)
         await ensureAdminUser();
+        await ensureUsersTableSchema();
         
         // 6. Explicitly Ensure Employees Table Exists (Safety Check)
         await ensureEmployeesTable();
@@ -143,6 +144,20 @@ const ensureEmployeesTable = async () => {
         console.error('[WARN] Gagal verifikasi tabel employees:', error.message);
     }
 }
+
+const ensureUsersTableSchema = async () => {
+    if (!pool) return;
+    try {
+        // Check if full_name column exists
+        const [columns] = await pool.query("SHOW COLUMNS FROM users LIKE 'full_name'");
+        if (columns.length === 0) {
+            await pool.query("ALTER TABLE users ADD COLUMN full_name VARCHAR(100) AFTER username");
+            console.log("[INFO] Added full_name column to users table.");
+        }
+    } catch (e) {
+        console.warn("[WARN] Failed to update users table schema:", e.message);
+    }
+};
 
 // Jalankan inisialisasi
 initDatabase();
@@ -214,11 +229,11 @@ app.post('/api/login', async (req, res) => {
         const hashedPassword = hashPassword(password);
         
         // 1. Cek Tabel Users (Admin)
-        const [users] = await pool.query('SELECT id, username, role FROM users WHERE username = ? AND password = ?', [username, hashedPassword]);
+        const [users] = await pool.query('SELECT id, username, role, full_name FROM users WHERE username = ? AND password = ?', [username, hashedPassword]);
         
         if (users.length > 0) {
             const user = users[0];
-            const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+            const token = jwt.sign({ id: user.id, username: user.username, role: user.role, full_name: user.full_name }, JWT_SECRET, { expiresIn: '24h' });
             console.log(`[LOGIN SUCCESS] Admin: ${username}`);
             return res.json({ success: true, user: user, token: token });
         } 
@@ -247,6 +262,66 @@ app.post('/api/login', async (req, res) => {
     } catch (error) {
         console.error(`[LOGIN ERROR]`, error);
         res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+    }
+});
+
+// --- PROFILE API ---
+app.put('/api/profile', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    
+    const { fullName, password } = req.body;
+    const userId = req.user.id;
+    const role = req.user.role;
+
+    // Validate inputs
+    if (!fullName || fullName.trim() === '') {
+        return res.status(400).json({ message: 'Nama lengkap tidak boleh kosong' });
+    }
+
+    try {
+        let query = '';
+        let params = [];
+        let hashedPassword = null;
+
+        if (password && password.trim() !== '') {
+            hashedPassword = hashPassword(password);
+        }
+
+        if (role === 'employee') {
+            if (hashedPassword) {
+                query = 'UPDATE employees SET name = ?, password = ? WHERE id = ?';
+                params = [fullName, hashedPassword, userId];
+            } else {
+                query = 'UPDATE employees SET name = ? WHERE id = ?';
+                params = [fullName, userId];
+            }
+        } else {
+            // Admin (users table)
+            if (hashedPassword) {
+                query = 'UPDATE users SET full_name = ?, password = ? WHERE id = ?';
+                params = [fullName, hashedPassword, userId];
+            } else {
+                query = 'UPDATE users SET full_name = ? WHERE id = ?';
+                params = [fullName, userId];
+            }
+        }
+
+        await pool.query(query, params);
+        
+        // Return updated user info (minus password)
+        const updatedUser = { ...req.user };
+        if (role === 'employee') {
+            updatedUser.name = fullName;
+            // Also update details if present in session logic (but here we just return success and client refetches or updates state)
+        } else {
+            updatedUser.full_name = fullName;
+        }
+
+        res.json({ success: true, message: 'Profil berhasil diperbarui', user: updatedUser });
+
+    } catch (error) {
+        console.error('[API ERROR] Update profile failed:', error);
+        res.status(500).json({ message: 'Gagal memperbarui profil' });
     }
 });
 

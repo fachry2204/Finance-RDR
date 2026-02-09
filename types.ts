@@ -87,4 +87,5 @@ export interface User {
   username: string;
   role: string;
   details?: Employee; // For Employee Role
+  full_name?: string; // For Admin Role
 }
