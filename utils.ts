@@ -49,4 +49,4 @@ export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
 };
 
-export const API_BASE_URL = 'http://localhost:3000';
+export const API_BASE_URL = '';

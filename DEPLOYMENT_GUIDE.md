@@ -1,6 +1,6 @@
 # Panduan Deployment ke Plesk (Node.js)
 
-Aplikasi ini menggunakan **React (Frontend)** dan **Express (Backend)** yang disatukan. Frontend sudah dibuild menjadi file statis dan akan diserve oleh backend Express.
+**UPDATE PENTING**: Aplikasi baru saja dibuild ulang untuk memperbaiki masalah koneksi database di Production. Harap upload ulang file `deployment.zip` yang baru.
 
 ## 1. Persiapan File
 Folder `server/` adalah folder utama yang akan diupload. Folder ini sekarang sudah berisi:
@@ -40,12 +40,16 @@ Karena file `.env` tidak ikut diupload (untuk keamanan), Anda perlu menambahkann
 
 ```
 PORT=3000
-DB_HOST=127.0.0.1  <-- Biasanya localhost atau 127.0.0.1 di Plesk
+DB_HOST=127.0.0.1
 DB_USER=nama_user_db_anda
 DB_PASSWORD=password_db_anda
 DB_NAME=nama_database_anda
 JWT_SECRET=rahasia_super_aman_ganti_ini
 ```
+
+**Catatan Khusus Plesk:**
+- Jika `127.0.0.1` tidak berhasil, coba ganti `DB_HOST` dengan **localhost**.
+- Pastikan user database memiliki akses ke database tersebut (Permission: Read/Write).
 
 ## 5. Jalankan Aplikasi
 1. Klik **Restart App** di Plesk.
@@ -53,6 +57,12 @@ JWT_SECRET=rahasia_super_aman_ganti_ini
 
 ---
 
-## Troubleshooting
-- **Error 500/502**: Cek Logs di Plesk. Pastikan `npm install` sukses dan variabel database benar.
-- **Gambar tidak muncul**: Pastikan folder `uploads` memiliki permission Write (755 atau 777).
+## Troubleshooting "Koneksi Database Terputus"
+Jika masih error setelah upload ulang:
+1. Buka website Anda di Chrome.
+2. Tekan `F12` (Developer Tools) -> Tab **Network**.
+3. Refresh halaman.
+4. Cari request bernama `test-db`.
+   - Jika **Merah (404/500)**: Klik request tersebut, lihat tab **Response**. Pesan error detail akan muncul di sana.
+   - Jika **Status 500**: Biasanya password database salah atau user tidak punya izin akses.
+   - Jika **Status 404**: Backend Node.js belum berjalan benar (pastikan file `index.js` terpilih sebagai Startup File).
