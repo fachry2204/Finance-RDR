@@ -28,24 +28,6 @@ export default defineConfig({
   build: {
     // Build langsung ke dalam folder server/public
     outDir: 'server/public',
-    emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            // Separate Lucide icons (usually large)
-            if (id.includes('lucide-react')) {
-              return 'lucide-vendor';
-            }
-            // Separate React ecosystem (including dependencies to avoid circular chunks)
-            if (id.includes('/react') || id.includes('/react-dom') || id.includes('/react-router') || id.includes('/scheduler') || id.includes('/prop-types')) {
-              return 'react-vendor';
-            }
-            // All other dependencies
-            return 'vendor';
-          }
-        }
-      }
-    }
+    emptyOutDir: true
   }
 })
