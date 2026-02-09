@@ -860,6 +860,50 @@ app.put('/api/reimbursements/:id', authenticateToken, async (req, res) => {
             'UPDATE reimbursements SET status = ?, rejection_reason = ?, transfer_proof_url = IFNULL(?, transfer_proof_url) WHERE id = ?',
             [status, rejectionReason || null, transferProofUrl || null, id]
         );
+
+        // --- AUTO NOTIFICATION LOGIC ---
+        try {
+            // Get Reimbursement Details
+            const [rows] = await pool.query('SELECT requestor_name, activity_name FROM reimbursements WHERE id = ?', [id]);
+            if (rows.length > 0) {
+                const r = rows[0];
+                
+                // Find Employee ID based on Name
+                const [empRows] = await pool.query('SELECT id FROM employees WHERE name = ?', [r.requestor_name]);
+                let userId = null;
+                if (empRows.length > 0) {
+                    userId = empRows[0].id;
+                }
+
+                // Create Notification Message
+                let message = `Pengajuan ${r.activity_name} telah diperbarui menjadi ${status}`;
+                let type = 'info';
+
+                if (status === 'BERHASIL') {
+                    message = `Selamat! Pengajuan ${r.activity_name} telah DISETUJUI dan dibayarkan.`;
+                    type = 'success';
+                } else if (status === 'DITOLAK') {
+                    message = `Mohon Maaf. Pengajuan ${r.activity_name} DITOLAK.`;
+                    type = 'error';
+                }
+
+                // Insert into Notifications Table
+                // Only if userId found or we want to broadcast? No, targeted only.
+                if (userId) {
+                    await pool.query(
+                        'INSERT INTO notifications (user_id, message, type, created_by) VALUES (?, ?, ?, ?)',
+                        [userId, message, type, req.user.id]
+                    );
+                } else {
+                     console.warn(`[WARN] Could not find user_id for requestor: ${r.requestor_name}. Notification skipped.`);
+                }
+            }
+        } catch (notifError) {
+            console.error('[WARN] Failed to create auto-notification:', notifError);
+            // Non-blocking error
+        }
+        // -------------------------------
+
         res.json({ status: 'success', message: 'Status updated' });
     } catch (error) {
         console.error('Error updating reimbursement:', error);
@@ -920,7 +964,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
             // Employee: 
             // 1. Manual Notifications (Targeted or Broadcast)
             const [manualNotifs] = await pool.query(
-                "SELECT * FROM notifications WHERE (user_id = ? OR user_id IS NULL) AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) ORDER BY created_at DESC", 
+                "SELECT * FROM notifications WHERE (user_id = ? OR user_id IS NULL) ORDER BY created_at DESC LIMIT 20", 
                 [userId]
             );
 
@@ -937,8 +981,6 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
             const [pendingRows] = await pool.query("SELECT COUNT(*) as count FROM reimbursements WHERE requestor_name = ? AND status = 'PENDING'", [requestorName]);
             const pendingCount = pendingRows[0].count;
 
-            const [recentRows] = await pool.query("SELECT * FROM reimbursements WHERE requestor_name = ? AND status IN ('DITOLAK', 'BERHASIL') ORDER BY timestamp DESC LIMIT 3", [requestorName]);
-            
             if (pendingCount > 0) {
                  notifications.push({
                     id: 'emp-pending',
@@ -946,14 +988,6 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
                     type: 'info'
                 });
             }
-
-            recentRows.forEach(r => {
-                notifications.push({
-                    id: `emp-status-${r.id}`,
-                    message: `Pengajuan ${r.activity_name} ${r.status === 'BERHASIL' ? 'Disetujui' : 'Ditolak'}`,
-                    type: r.status === 'BERHASIL' ? 'success' : 'error'
-                });
-            });
             
             count = notifications.length;
         }

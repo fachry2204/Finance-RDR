@@ -21,10 +21,28 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
   const employeeDetails = user.details;
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  
+  // Refs for polling logic
+  const lastNotifIdRef = React.useRef<string | number | null>(null);
+  const isFirstLoadRef = React.useRef(true);
 
   useEffect(() => {
+    // Request notification permission
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+    }
+
     fetchReimbursements();
     fetchNotifications();
+
+    // Polling interval (every 10 seconds)
+    const interval = setInterval(() => {
+        fetchNotifications();
+        // Also refresh reimbursements to keep status up to date
+        fetchReimbursements(); 
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [authToken]);
 
   const fetchNotifications = async () => {
@@ -35,7 +53,28 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
         });
         if (response.ok) {
             const data = await response.json();
-            setNotifications(data.notifications);
+            const fetchedNotifs = data.notifications;
+            setNotifications(fetchedNotifs);
+
+            // Push Notification Logic
+            if (fetchedNotifs.length > 0) {
+                const topId = fetchedNotifs[0].id;
+                
+                // Detect new top notification
+                if (topId !== lastNotifIdRef.current) {
+                    // Only notify if not first load
+                    if (!isFirstLoadRef.current) {
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            new Notification('Ruang Dimensi Records', {
+                                body: fetchedNotifs[0].message,
+                                icon: '/vite.svg' // Optional icon
+                            });
+                        }
+                    }
+                    lastNotifIdRef.current = topId;
+                }
+            }
+            isFirstLoadRef.current = false;
         }
     } catch (error) {
         console.error("Failed to fetch notifications", error);
