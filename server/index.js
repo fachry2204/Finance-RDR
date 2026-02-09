@@ -988,6 +988,57 @@ app.post('/api/notifications', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/api/admin/notifications', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    try {
+        // Join with employees table to get recipient name
+        // Use LEFT JOIN users table if user_id refers to users table, or employees table?
+        // Based on implementation, user_id in notifications seems to refer to ID that is passed from EmployeeManager which is likely employee ID.
+        // However, in the DB, let's assume it links to employees table for now as the dropdown fetches employees.
+        
+        const query = `
+            SELECT n.*, e.name as recipient_name 
+            FROM notifications n 
+            LEFT JOIN employees e ON n.user_id = e.id 
+            ORDER BY n.created_at DESC
+        `;
+        const [rows] = await pool.query(query);
+        
+        const notifications = rows.map(row => ({
+            ...row,
+            recipient_name: row.user_id ? (row.recipient_name || 'Unknown User') : 'Semua Pegawai (Broadcast)'
+        }));
+
+        res.json(notifications);
+    } catch (error) {
+        console.error('[API ERROR] Get admin notifications failed:', error);
+        res.status(500).json({ message: 'Gagal mengambil riwayat notifikasi' });
+    }
+});
+
+app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { id } = req.params;
+
+    try {
+        await pool.query('DELETE FROM notifications WHERE id = ?', [id]);
+        res.json({ success: true, message: 'Notifikasi berhasil dihapus' });
+    } catch (error) {
+        console.error('[API ERROR] Delete notification failed:', error);
+        res.status(500).json({ message: 'Gagal menghapus notifikasi' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
