@@ -13,6 +13,7 @@ interface ReimbursementProps {
   categories: string[];
   authToken: string | null;
   isEmployeeView?: boolean;
+  currentUser?: any;
 }
 
 const ReimbursementPage: React.FC<ReimbursementProps> = ({ 
@@ -23,7 +24,8 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   onUpdateReimbursementDetails,
   categories,
   authToken,
-  isEmployeeView = false
+  isEmployeeView = false,
+  currentUser
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   const [selectedReimb, setSelectedReimb] = useState<Reimbursement | null>(null);
@@ -187,14 +189,25 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   };
 
   const resetForm = () => {
+    setSelectedReimb(null);
     setEditingReimbId(null);
     setDate(new Date().toISOString().split('T')[0]);
-    setRequestorName('');
+    
+    // Auto-fill Name for Employee
+    if (isEmployeeView && currentUser) {
+        // Use details.name if available (Employee), else full_name (User), else username
+        const name = currentUser.details?.name || currentUser.full_name || currentUser.username || '';
+        setRequestorName(name);
+    } else {
+        setRequestorName('');
+    }
+
     setCategory('');
     setActivityName('');
     setDescription('');
     setItems([]);
     setEditingItemId(null);
+    setIsSubmitting(false);
   };
 
   // --- EDIT & DELETE HANDLERS ---
@@ -323,7 +336,15 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nama Pengaju</label>
               <div className="relative">
                 <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input type="text" required placeholder="Nama Lengkap" value={requestorName} onChange={e => setRequestorName(e.target.value)} className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 pl-10 focus:ring-blue-500 outline-none transition-colors" />
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="Nama Lengkap" 
+                  value={requestorName} 
+                  onChange={e => setRequestorName(e.target.value)} 
+                  className={`w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 pl-10 focus:ring-blue-500 outline-none transition-colors ${isEmployeeView ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
+                  readOnly={isEmployeeView}
+                />
               </div>
             </div>
             <div>

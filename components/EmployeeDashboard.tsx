@@ -108,6 +108,7 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
                     categories={categories}
                     authToken={authToken}
                     isEmployeeView={true}
+                    currentUser={user}
                   />
               </div>
           </div>
