@@ -11,6 +11,7 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import EmployeeManager from './components/EmployeeManager';
 import EmployeeDashboard from './components/EmployeeDashboard';
+import ProfileModal from './components/ProfileModal';
 import { Transaction, Reimbursement, PageView, AppSettings, User } from './types';
 import { AlertTriangle } from 'lucide-react';
 import { API_BASE_URL } from './utils';
@@ -21,6 +22,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [isDbConnected, setIsDbConnected] = useState(true);
 
   // App State
@@ -84,6 +86,27 @@ const App: React.FC = () => {
       setCurrentUser(null);
       setToken(null);
       setShowLogoutModal(false);
+  };
+
+  // --- PROFILE HANDLERS ---
+  const handleUpdateProfile = async (fullName: string, password?: string) => {
+      const response = await authFetch('/api/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fullName, password })
+      });
+
+      if (response && response.ok) {
+          const data = await response.json();
+          // Update local state and storage
+          if (data.user) {
+              setCurrentUser(data.user);
+              localStorage.setItem('rdr_user', JSON.stringify(data.user));
+          }
+          alert('Profil berhasil diperbarui!');
+      } else {
+          alert('Gagal memperbarui profil.');
+      }
   };
 
   // --- HELPER FETCH WITH AUTH ---
@@ -227,7 +250,14 @@ const App: React.FC = () => {
                 user={currentUser} 
                 authToken={token}
                 categories={appSettings.categories}
-                onLogout={() => setShowLogoutModal(true)} 
+                onLogout={() => setShowLogoutModal(true)}
+                onProfileClick={() => setShowProfileModal(true)} 
+            />
+            <ProfileModal 
+                user={currentUser}
+                isOpen={showProfileModal}
+                onClose={() => setShowProfileModal(false)}
+                onUpdateProfile={handleUpdateProfile}
             />
              {showLogoutModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fade-in">
@@ -256,6 +286,7 @@ const App: React.FC = () => {
         onLogoutClick={() => setShowLogoutModal(true)} 
         toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isDbConnected={isDbConnected}
+        onProfileClick={() => setShowProfileModal(true)}
       />
       <div className="flex flex-1 pt-16 overflow-hidden">
         <Sidebar activePage={activePage} setActivePage={setActivePage} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />

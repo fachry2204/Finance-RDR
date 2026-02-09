@@ -9,9 +9,10 @@ interface HeaderProps {
   onLogoutClick: () => void;
   toggleSidebar: () => void;
   isDbConnected: boolean;
+  onProfileClick: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isDbConnected }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isDbConnected, onProfileClick }) => {
   return (
     <header className="h-16 bg-white border-b border-slate-200 fixed top-0 left-0 right-0 z-40 px-4 md:px-6 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-3">
@@ -42,15 +43,18 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
            </span>
         </div>
 
-        <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+        <button 
+          onClick={onProfileClick}
+          className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-100 transition-colors cursor-pointer group"
+        >
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
             <UserIcon size={16} />
           </div>
-          <div className="hidden md:block pr-2">
-            <p className="text-sm font-semibold text-slate-700">{user?.username || 'Admin'}</p>
-            <p className="text-[10px] text-slate-500 uppercase leading-none">{user?.role || 'User'}</p>
+          <div className="hidden md:block pr-2 text-left">
+            <p className="text-sm font-semibold text-slate-700 group-hover:text-blue-700 transition-colors">{user?.role === 'employee' ? user.details?.name : (user?.full_name || user?.username || 'Admin')}</p>
+            <p className="text-[10px] text-slate-500 uppercase leading-none group-hover:text-blue-500 transition-colors">{user?.role || 'User'}</p>
           </div>
-        </div>
+        </button>
         
         <button 
           onClick={onLogoutClick}
