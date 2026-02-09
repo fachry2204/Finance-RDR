@@ -9,9 +9,10 @@ interface EmployeeDashboardProps {
   authToken: string | null;
   categories: string[];
   onLogout: () => void;
+  onProfileClick: () => void;
 }
 
-const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, categories, onLogout }) => {
+const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, categories, onLogout, onProfileClick }) => {
   const employeeDetails = user.details;
   const [view, setView] = useState<'DASHBOARD' | 'REIMBURSEMENT'>('DASHBOARD');
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
@@ -172,10 +173,18 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
          </div>
 
          {/* Profile Card */}
-         <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-100">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-               <User size={18} className="text-blue-600"/> Data Diri
-            </h3>
+         <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-100 relative group">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                   <User size={18} className="text-blue-600"/> Data Diri
+                </h3>
+                <button 
+                    onClick={onProfileClick}
+                    className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors"
+                >
+                    Edit Profil
+                </button>
+            </div>
             <div className="space-y-3">
                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">

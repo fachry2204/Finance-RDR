@@ -317,6 +317,13 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ProfileModal 
+        user={currentUser}
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onUpdateProfile={handleUpdateProfile}
+      />
     </div>
   );
 };
