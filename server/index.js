@@ -885,6 +885,14 @@ if (fs.existsSync(publicPath)) {
 }
 
 // --- NOTIFICATIONS API ---
+app.get('/api/test-db', (req, res) => {
+    if (pool) {
+        res.json({ status: 'success', message: 'Database connected' });
+    } else {
+        res.status(500).json({ status: 'error', message: 'Database not connected' });
+    }
+});
+
 app.get('/api/notifications', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     
