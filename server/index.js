@@ -1031,10 +1031,6 @@ app.get('/api/admin/notifications', authenticateToken, async (req, res) => {
 
     try {
         // Join with employees table to get recipient name
-        // Use LEFT JOIN users table if user_id refers to users table, or employees table?
-        // Based on implementation, user_id in notifications seems to refer to ID that is passed from EmployeeManager which is likely employee ID.
-        // However, in the DB, let's assume it links to employees table for now as the dropdown fetches employees.
-        
         const query = `
             SELECT n.*, e.name as recipient_name 
             FROM notifications n 
@@ -1043,6 +1039,8 @@ app.get('/api/admin/notifications', authenticateToken, async (req, res) => {
         `;
         const [rows] = await pool.query(query);
         
+        console.log(`[DEBUG] Admin fetching notifications. Found ${rows.length} rows.`);
+
         const notifications = rows.map(row => ({
             ...row,
             recipient_name: row.user_id ? (row.recipient_name || 'Unknown User') : 'Semua Pegawai (Broadcast)'
