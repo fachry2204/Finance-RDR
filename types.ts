@@ -84,6 +84,16 @@ export interface Employee {
   photo_url?: string;
 }
 
+export interface ActivityLog {
+  id: number;
+  user_id: number;
+  username: string;
+  action: string;
+  ip_address: string;
+  device_info: string;
+  created_at: string;
+}
+
 export interface User {
   id: number;
   username: string;

@@ -18,10 +18,15 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Only fetch for admin here, as employee has their own dashboard notifications
-    if (user?.role === 'admin') {
-      fetchNotifications();
-    }
+    // Fetch notifications for all users (Admin & Employee)
+    fetchNotifications();
+
+    // Poll for new notifications every 15 seconds
+    const interval = setInterval(() => {
+        fetchNotifications();
+    }, 15000);
+
+    return () => clearInterval(interval);
   }, [user]);
 
   const fetchNotifications = async () => {
@@ -34,7 +39,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
             setNotificationCount(data.count);
         }
     } catch (e) {
-        console.error("Failed to fetch admin notifications");
+        console.error("Failed to fetch notifications");
     }
   };
 
@@ -68,20 +73,18 @@ const Header: React.FC<HeaderProps> = ({ user, onLogoutClick, toggleSidebar, isD
            </span>
         </div>
 
-        {/* Admin Notification Bell */}
-        {user?.role === 'admin' && (
-             <div className="relative">
-                 <button 
-                    onClick={() => navigate('/notifikasi')}
-                    className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg cursor-pointer relative transition-colors"
-                 >
-                     <Bell size={20} />
-                     {notificationCount > 0 && (
-                         <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
-                     )}
-                 </button>
-             </div>
-        )}
+        {/* Notification Bell */}
+        <div className="relative">
+            <button 
+            onClick={() => navigate('/notifikasi')}
+            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg cursor-pointer relative transition-colors"
+            >
+                <Bell size={20} />
+                {notificationCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                )}
+            </button>
+        </div>
 
         <button 
           onClick={onProfileClick}

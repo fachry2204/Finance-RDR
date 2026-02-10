@@ -53,6 +53,26 @@ const hashPassword = (password) => {
     return crypto.createHash('sha256').update(password).digest('hex');
 };
 
+const ensureActivityLogsTableSchema = async () => {
+    if (!pool) return;
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT,
+                username VARCHAR(100),
+                action TEXT NOT NULL,
+                ip_address VARCHAR(45),
+                device_info TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log('[SUCCESS] Tabel activity_logs terverifikasi.');
+    } catch (error) {
+        console.error('[WARN] Gagal verifikasi tabel activity_logs:', error.message);
+    }
+};
+
 const ensureCategoriesTableSchema = async () => {
     if (!pool) return;
     try {
@@ -148,6 +168,9 @@ const initDatabase = async () => {
         // 8. Ensure Categories Table Schema (Migration)
         await ensureCategoriesTableSchema();
 
+        // 9. Ensure Activity Logs Table Exists
+        await ensureActivityLogsTableSchema();
+
     } catch (err) {
         console.error('\n===================================================');
         console.error('[FATAL] KONEKSI DATABASE GAGAL');
@@ -227,12 +250,50 @@ const ensureNotificationsTable = async () => {
         } catch (e) {
             // Ignore error if column already exists
         }
-
+        
         console.log('[SUCCESS] Tabel notifications terverifikasi.');
     } catch (error) {
         console.error('[WARN] Gagal verifikasi tabel notifications:', error.message);
     }
-};
+}
+
+// --- LOGGING HELPER ---
+const logActivity = async (req, action, userId = null, username = null) => {
+    if (!pool) return;
+    try {
+        let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
+        
+        // Normalize IP
+        if (ip === '::1') {
+            ip = '127.0.0.1';
+        } else if (ip && ip.startsWith('::ffff:')) {
+            ip = ip.replace('::ffff:', '');
+        }
+
+        const device = req.headers['user-agent'] || 'Unknown';
+        
+        // Try to get user info from token if not provided
+        if (!userId || !username) {
+            const authHeader = req.headers['authorization'];
+            if (authHeader) {
+                const token = authHeader.split(' ')[1];
+                const session = tokenCache.get(token);
+                if (session) {
+                    // Fix: session object is flat (id, username), not nested under user
+                    userId = userId || session.id || (session.user && session.user.id);
+                    username = username || session.username || (session.user && session.user.username);
+                }
+            }
+        }
+
+        await pool.query(
+            'INSERT INTO activity_logs (user_id, username, action, ip_address, device_info) VALUES (?, ?, ?, ?, ?)',
+            [userId, username, action, ip, device]
+        );
+    } catch (error) {
+        console.error('[ERROR] Failed to log activity:', error);
+    }
+};;
 
 const ensureUsersTableSchema = async () => {
     if (!pool) return;
@@ -330,6 +391,18 @@ app.get('/api/test-db', async (req, res) => {
     }
 });
 
+// --- ACTIVITY LOGS API ---
+app.get('/api/logs', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    try {
+        const [rows] = await pool.query('SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 1000');
+        res.json(rows);
+    } catch (error) {
+        console.error('[API ERROR] Fetch logs failed:', error);
+        res.status(500).json({ message: 'Failed to fetch logs' });
+    }
+});
+
 // Login Route (Supports Users & Employees)
 app.post('/api/login', async (req, res) => {
     if (!pool) return res.status(500).json({ success: false, message: 'DB not connected' });
@@ -352,6 +425,8 @@ app.post('/api/login', async (req, res) => {
             // SIMPAN KE CACHE
             tokenCache.set(token, userPayload);
             
+            logActivity(req, `Login Berhasil (Admin)`, user.id, user.username);
+
             console.log(`[LOGIN SUCCESS] Admin: ${username} (Token Cached)`);
             return res.json({ success: true, user: user, token: token });
         } 
@@ -368,6 +443,8 @@ app.post('/api/login', async (req, res) => {
             // SIMPAN KE CACHE
             tokenCache.set(token, userPayload);
             
+            logActivity(req, `Login Berhasil (Pegawai)`, emp.id, emp.username);
+
             console.log(`[LOGIN SUCCESS] Employee: ${username} (Token Cached)`);
             
             const userObj = {
@@ -380,6 +457,7 @@ app.post('/api/login', async (req, res) => {
             return res.json({ success: true, user: userObj, token: token });
         }
 
+        logActivity(req, `Login Gagal: ${username}`);
         console.log(`[LOGIN FAILED] Invalid credentials for: ${username}`);
         res.status(401).json({ success: false, message: 'Username atau password salah' });
 
@@ -395,6 +473,12 @@ app.post('/api/logout', (req, res) => {
     const token = authHeader && authHeader.split(' ')[1];
     
     if (token && tokenCache.has(token)) {
+        // Try to get user info before deleting
+        const session = tokenCache.get(token);
+        if (session) {
+             logActivity(req, 'Logout', session.id || session.user?.id, session.username || session.user?.username);
+        }
+
         tokenCache.delete(token);
         console.log('[LOGOUT] Token removed from cache.');
     }
@@ -445,6 +529,8 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
 
         await pool.query(query, params);
         
+        logActivity(req, `Update Profil: ${fullName}`, userId, req.user.username);
+
         // Return updated user info
         const updatedUser = { ...req.user };
         const { photoUrl } = req.body;
@@ -494,6 +580,7 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
             'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
             [key, stringValue, stringValue]
         );
+        logActivity(req, `Update Pengaturan: ${key}`);
         res.json({ success: true, message: 'Settings saved' });
     } catch (error) {
         console.error('[API ERROR] Save setting failed:', error);
@@ -530,6 +617,7 @@ app.post('/api/categories', authenticateToken, async (req, res) => {
 
     try {
         await pool.query('INSERT INTO categories (name, type) VALUES (?, ?)', [name, categoryType]);
+        logActivity(req, `Tambah Kategori: ${name} (${categoryType})`);
         res.json({ success: true, message: 'Category added' });
     } catch (error) {
         console.error('[API ERROR] Add category failed:', error);
@@ -555,6 +643,7 @@ app.delete('/api/categories/:name', authenticateToken, async (req, res) => {
         }
 
         await pool.query(query, params);
+        logActivity(req, `Hapus Kategori: ${name}`);
         res.json({ success: true, message: 'Category deleted' });
     } catch (error) {
         console.error('[API ERROR] Delete category failed:', error);
@@ -579,6 +668,7 @@ app.post('/api/users', authenticateToken, async (req, res) => {
     try {
         const hashedPassword = hashPassword(password);
         await pool.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, hashedPassword, 'admin']);
+        logActivity(req, `Tambah User Admin: ${username}`);
         res.json({ success: true, message: 'User created' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to create user. Username might exist.' });
@@ -590,6 +680,7 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM users WHERE id = ?', [id]);
+        logActivity(req, `Hapus User Admin: ${id}`);
         res.json({ success: true, message: 'User deleted' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to delete user' });
@@ -617,6 +708,7 @@ app.post('/api/employees', authenticateToken, async (req, res) => {
             'INSERT INTO employees (name, position, phone, email, username, password) VALUES (?, ?, ?, ?, ?, ?)',
             [name, position, phone, email, username, hashedPassword]
         );
+        logActivity(req, `Tambah Pegawai: ${name}`);
         res.json({ success: true, message: 'Pegawai berhasil ditambahkan' });
     } catch (error) {
         console.error('[API ERROR] Add employee failed:', error);
@@ -645,6 +737,7 @@ app.put('/api/employees/:id', authenticateToken, async (req, res) => {
                 [name, position, phone, email, username, id]
             );
         }
+        logActivity(req, `Update Data Pegawai: ${name}`);
         res.json({ success: true, message: 'Data pegawai diperbarui' });
     } catch (error) {
         console.error('[API ERROR] Update employee failed:', error);
@@ -657,6 +750,7 @@ app.delete('/api/employees/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM employees WHERE id = ?', [id]);
+        logActivity(req, `Hapus Pegawai: ${id}`);
         res.json({ success: true, message: 'Pegawai dihapus' });
     } catch (error) {
          console.error('[API ERROR] Delete employee failed:', error);
@@ -736,6 +830,9 @@ app.post('/api/transactions', authenticateToken, async (req, res) => {
         }
 
         await conn.commit();
+        const typeLabel = t.type === 'PEMASUKAN' ? 'Pemasukan' : 'Pengeluaran';
+        const formattedTotal = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(t.grandTotal);
+        logActivity(req, `Tambah Transaksi (${typeLabel}): ${t.activityName} - ${formattedTotal}`);
         res.json({ status: 'success', message: 'Transaction saved' });
     } catch (error) {
         await conn.rollback();
@@ -752,6 +849,7 @@ app.delete('/api/transactions/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM transactions WHERE id = ?', [id]);
+        logActivity(req, `Hapus Transaksi: ${id}`);
         res.json({ status: 'success', message: 'Transaction deleted' });
     } catch (error) {
         console.error('Error deleting transaction:', error);
@@ -782,6 +880,7 @@ app.put('/api/transactions/:id', authenticateToken, async (req, res) => {
             }
         }
         await conn.commit();
+        logActivity(req, `Update Transaksi: ${id}`);
         res.json({ status: 'success', message: 'Transaction updated' });
     } catch (error) {
         await conn.rollback();
@@ -881,6 +980,9 @@ app.post('/api/reimbursements', authenticateToken, async (req, res) => {
             console.error('[WARN] Failed to create admin notification:', notifErr);
         }
 
+        const formattedTotal = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(r.grandTotal);
+        logActivity(req, `Pengajuan Reimbursement Baru: ${r.activityName} - ${formattedTotal}`);
+
         res.json({ status: 'success', message: 'Reimbursement saved' });
     } catch (error) {
         await conn.rollback();
@@ -939,6 +1041,19 @@ app.put('/api/reimbursements/:id/details', authenticateToken, async (req, res) =
             }
         }
         await conn.commit();
+        
+        // Create Notification for Admin (Update Details)
+        try {
+            const formattedTotal = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(r.grandTotal);
+            await pool.query(
+                "INSERT INTO notifications (message, type, target_role, created_by) VALUES (?, 'info', 'admin', ?)",
+                [`Update Reimbursement: ${requestorName} - ${r.activityName} (${formattedTotal})`, req.user.id]
+            );
+        } catch (notifErr) {
+            console.error('[WARN] Failed to create admin notification (update):', notifErr);
+        }
+
+        logActivity(req, `Update Detail Reimbursement: ${r.activityName}`);
         res.json({ status: 'success', message: 'Reimbursement details updated' });
     } catch (error) {
         await conn.rollback();
@@ -960,6 +1075,7 @@ app.delete('/api/reimbursements/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM reimbursements WHERE id = ?', [id]);
+        logActivity(req, `Hapus Reimbursement: ID ${id}`);
         res.json({ status: 'success', message: 'Reimbursement deleted' });
     } catch (error) {
         console.error('Error deleting reimbursement:', error);
@@ -1021,6 +1137,8 @@ app.put('/api/reimbursements/:id', authenticateToken, async (req, res) => {
             // Non-blocking error
         }
         // -------------------------------
+
+        logActivity(req, `Update Status Reimbursement (ID ${id}): ${status}`);
 
         res.json({ status: 'success', message: 'Status updated' });
     } catch (error) {

@@ -13,6 +13,7 @@ import EmployeeManager from './components/EmployeeManager';
 import EmployeeDashboard from './components/EmployeeDashboard';
 import ProfileModal from './components/ProfileModal';
 import NotificationManager from './components/NotificationManager';
+import ActivityLogPage from './components/ActivityLog';
 import { Transaction, Reimbursement, AppSettings, User } from './types';
 import { AlertTriangle } from 'lucide-react';
 import { API_BASE_URL } from './utils';
@@ -234,52 +235,8 @@ const App: React.FC = () => {
 
   const commonProps = { authToken: token };
 
-  // --- LAYOUT COMPONENTS ---
-  
-  const AdminLayout = () => {
-    return (
-      <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
-        <Header 
-          user={currentUser} 
-          onLogoutClick={() => setShowLogoutModal(true)} 
-          toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-          isDbConnected={isDbConnected}
-          onProfileClick={() => setShowProfileModal(true)}
-        />
-        <div className="flex flex-1 pt-16 overflow-hidden">
-          <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-              <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-thin">
-                  <div className="max-w-7xl mx-auto">
-                      <Outlet />
-                  </div>
-              </main>
-              <div className="shrink-0 z-20">
-                <Footer />
-              </div>
-          </div>
-        </div>
-        <SharedModals />
-      </div>
-    );
-  };
-
-  const EmployeeLayout = () => {
-    return (
-      <>
-        <EmployeeDashboard 
-            user={currentUser!} 
-            authToken={token}
-            categories={appSettings.categories}
-            onLogout={() => setShowLogoutModal(true)}
-            onProfileClick={() => setShowProfileModal(true)} 
-        />
-        <SharedModals />
-      </>
-    );
-  };
-
-  const SharedModals = () => (
+  // --- LAYOUT HELPER ---
+  const renderSharedModals = () => (
     <>
       {showLogoutModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fade-in">
@@ -320,14 +277,6 @@ const App: React.FC = () => {
       );
   }
 
-  // Redirect Logic based on Role
-  const DefaultRedirect = () => {
-    if (currentUser?.role === 'employee') {
-      return <Navigate to="/employee" replace />;
-    }
-    return <Navigate to="/dashboard" replace />;
-  };
-
   return (
     <BrowserRouter>
       <Routes>
@@ -336,12 +285,47 @@ const App: React.FC = () => {
 
         {/* Employee Routes */}
         {currentUser?.role === 'employee' && (
-           <Route path="/employee/*" element={<EmployeeLayout />} />
+           <Route path="/employee/*" element={
+              <>
+                <EmployeeDashboard 
+                    user={currentUser!} 
+                    authToken={token}
+                    categories={appSettings.categories}
+                    onLogout={() => setShowLogoutModal(true)}
+                    onProfileClick={() => setShowProfileModal(true)} 
+                />
+                {renderSharedModals()}
+              </>
+           } />
         )}
 
         {/* Admin Routes */}
         {currentUser?.role !== 'employee' && (
-          <Route element={<AdminLayout />}>
+          <Route element={
+              <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
+                <Header 
+                  user={currentUser} 
+                  onLogoutClick={() => setShowLogoutModal(true)} 
+                  toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                  isDbConnected={isDbConnected}
+                  onProfileClick={() => setShowProfileModal(true)}
+                />
+                <div className="flex flex-1 pt-16 overflow-hidden">
+                  <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+                  <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                      <main className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-thin">
+                          <div className="max-w-7xl mx-auto">
+                              <Outlet />
+                          </div>
+                      </main>
+                      <div className="shrink-0 z-20">
+                        <Footer />
+                      </div>
+                  </div>
+                </div>
+                {renderSharedModals()}
+              </div>
+          }>
             <Route path="/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="ALL" />} />
             <Route path="/jurnal" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
           <Route path="/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
@@ -357,12 +341,13 @@ const App: React.FC = () => {
             
             <Route path="/pegawai" element={<EmployeeManager {...commonProps} />} />
             <Route path="/notifikasi" element={<NotificationManager {...commonProps} />} />
+            <Route path="/log-aktivitas" element={<ActivityLogPage user={currentUser} />} />
             <Route path="/pengaturan" element={<Settings settings={appSettings} onUpdateSettings={handleUpdateSettings} {...commonProps} />} />
           </Route>
         )}
 
         {/* Catch All - Redirect to Default */}
-        <Route path="*" element={<DefaultRedirect />} />
+        <Route path="*" element={currentUser?.role === 'employee' ? <Navigate to="/employee" replace /> : <Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

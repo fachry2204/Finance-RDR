@@ -247,8 +247,9 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
     } else {
         setRequestorName('');
     }
+    
+    setCategory('Operasional'); // Default category for all
 
-    setCategory('');
     setActivityName('');
     setDescription('');
     setItems([]);
@@ -409,20 +410,9 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                 )}
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Kategori</label>
-              <select 
-                required 
-                value={category} 
-                onChange={e => setCategory(e.target.value)} 
-                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 outline-none transition-colors"
-              >
-                <option value="" disabled>Pilih Kategori</option>
-                {categories.map((cat, idx) => (
-                  <option key={idx} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
+            {!isEmployeeView && (
+              <></>
+            )}
              <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nama Kegiatan</label>
               <input type="text" required value={activityName} onChange={e => setActivityName(e.target.value)} className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white border p-2.5 outline-none transition-colors" />
@@ -568,7 +558,6 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                       <td className="px-6 py-4 text-sm font-medium text-slate-700 dark:text-slate-300">{r.requestorName}</td>
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                         <div>{r.activityName}</div>
-                        <div className="text-xs text-slate-400">{r.category}</div>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{r.items.length} Item</td>
                       <td className="px-6 py-4 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(r.grandTotal)}</td>
@@ -669,7 +658,6 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Kegiatan</p>
                       <p className="font-medium text-slate-800 dark:text-white">{selectedReimb.activityName}</p>
-                      <p className="text-xs text-slate-500">{selectedReimb.category}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Keterangan</p>

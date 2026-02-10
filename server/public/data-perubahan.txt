@@ -1,5 +1,23 @@
 <div class="space-y-4">
     <div>
+        <h4 class="font-bold text-slate-800">Versi 1.0.3</h4>
+        <ul class="list-disc pl-5 text-sm text-slate-600 mt-1 space-y-1">
+            <li>Perbaikan format log aktivitas menjadi bahasa Indonesia natural (tanpa underscore).</li>
+            <li>Perbaikan sistem notifikasi: Lonceng aktif untuk semua user (Admin & Pegawai).</li>
+            <li>Penambahan auto-refresh notifikasi setiap 15 detik.</li>
+            <li>Perbaikan notifikasi real-time untuk update detail reimbursement.</li>
+        </ul>
+    </div>
+    <div class="pt-4 border-t border-slate-100">
+        <h4 class="font-bold text-slate-800">Versi 1.0.2</h4>
+        <ul class="list-disc pl-5 text-sm text-slate-600 mt-1 space-y-1">
+            <li>Implementasi fitur Log Aktivitas (Audit Trail) untuk memantau aktivitas pengguna.</li>
+            <li>Perbaikan tampilan halaman Login (perbaikan CSS).</li>
+            <li>Perbaikan bug halaman refresh saat menambah kategori pemasukan.</li>
+            <li>Menambahkan menu Log Aktivitas di Sidebar.</li>
+        </ul>
+    </div>
+    <div class="pt-4 border-t border-slate-100">
         <h4 class="font-bold text-slate-800">Versi 1.0.1</h4>
         <ul class="list-disc pl-5 text-sm text-slate-600 mt-1 space-y-1">
             <li>Menambahkan Laporan Pemasukan terpisah.</li>
