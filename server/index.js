@@ -552,6 +552,27 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
 });
 
 // --- SETTINGS API (NEW) ---
+app.get('/api/public-settings', async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    try {
+        const [rows] = await pool.query('SELECT setting_key, setting_value FROM settings WHERE setting_key IN ("logoUrl", "loginBackgroundUrl", "systemName")');
+        
+        const result = { logoUrl: null, loginBackgroundUrl: null, systemName: null };
+        rows.forEach(row => {
+             try {
+                 result[row.setting_key] = JSON.parse(row.setting_value);
+             } catch(e) {
+                 result[row.setting_key] = row.setting_value;
+             }
+        });
+        
+        res.json(result);
+    } catch (error) {
+        console.error('[API ERROR] Fetch public settings failed:', error);
+        res.status(500).json({ message: 'Failed to fetch public settings' });
+    }
+});
+
 app.get('/api/settings', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
     try {

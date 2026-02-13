@@ -6,9 +6,12 @@ import { API_BASE_URL } from '../utils';
 interface LoginProps {
   onLogin: (user: any, token: string) => void;
   isDbConnected?: boolean;
+  logoUrl?: string;
+  loginBackgroundUrl?: string;
+  systemName?: string;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true, logoUrl, loginBackgroundUrl, systemName }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -52,7 +55,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
           <img 
-            src="https://ruangdimensirecords.com/img/bg.jpg" 
+            src={loginBackgroundUrl ? (loginBackgroundUrl.startsWith('/uploads') ? `${API_BASE_URL}${loginBackgroundUrl}` : loginBackgroundUrl) : "https://ruangdimensirecords.com/img/bg.jpg"} 
             alt="Background" 
             className="w-full h-full object-cover opacity-50"
           />
@@ -89,12 +92,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
       <div className={`relative z-10 bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 transition-all duration-300 ${!isDbConnected ? 'filter blur-sm pointer-events-none' : ''}`}>
         <div className="text-center mb-8">
           <img 
-            src="https://ruangdimensirecords.com/img/logo.png" 
+            src={logoUrl ? (logoUrl.startsWith('/uploads') ? `${API_BASE_URL}${logoUrl}` : logoUrl) : "https://ruangdimensirecords.com/img/logo.png"} 
             alt="RDR Logo" 
-            className="h-24 w-auto mx-auto mb-6 object-contain drop-shadow-md"
+            className="w-[100px] h-auto mx-auto mb-4 object-contain drop-shadow-md"
           />
-          <h1 className="text-2xl font-bold text-slate-800">Selamat Datang</h1>
-          <p className="text-slate-500">Sistem Informasi Keuangan RDR</p>
+          {systemName && (
+              <h2 className="text-xl font-bold text-slate-800 mb-2">{systemName}</h2>
+          )}
+          <h1 className="text-lg font-semibold text-slate-600">Selamat Datang</h1>
+          <p className="text-slate-500 text-sm">Silahkan login untuk melanjutkan</p>
         </div>
 
         {error && (
@@ -112,7 +118,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
                 type="text" 
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-slate-800 focus:ring-2 focus:ring-slate-100 outline-none transition-all"
                 placeholder="Masukkan username"
                 required
                 disabled={!isDbConnected}
@@ -128,7 +134,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-slate-800 focus:ring-2 focus:ring-slate-100 outline-none transition-all"
                 placeholder="Masukkan password"
                 required
                 disabled={!isDbConnected}
@@ -139,7 +145,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true }) => {
           <button 
             type="submit" 
             disabled={loading || !isDbConnected}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full bg-slate-900 hover:bg-black text-white font-semibold py-3 rounded-xl transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {loading ? 'Memproses...' : 'Masuk Sistem'}
           </button>

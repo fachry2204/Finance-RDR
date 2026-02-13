@@ -25,11 +25,39 @@ const App: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [isDbConnected, setIsDbConnected] = useState(true);
+  const [isDbConnected, setIsDbConnected] = useState(false); // Default false to ensure check passes before fetching
 
   // App State
   // const [activePage, setActivePage] = useState<PageView>('DASHBOARD'); // REMOVED
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Initialize Dark Mode from LocalStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    // Default to Dark Mode if no preference is saved
+    if (savedTheme === 'dark' || !savedTheme) {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => {
+      const newMode = !prev;
+      if (newMode) {
+        localStorage.setItem('theme', 'dark');
+        document.documentElement.classList.add('dark');
+      } else {
+        localStorage.setItem('theme', 'light');
+        document.documentElement.classList.remove('dark');
+      }
+      return newMode;
+    });
+  };
   
   // Check LocalStorage for Persisted Login (Session Only)
   useEffect(() => {
@@ -59,6 +87,7 @@ const App: React.FC = () => {
   // Poll database connection every 30 seconds
   useEffect(() => {
     checkDbConnection(); // Initial check
+    
     const interval = setInterval(async () => {
       const connected = await checkDbConnection();
       
@@ -70,6 +99,23 @@ const App: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [isLoggedIn]);
+
+  // Fetch Public Settings when DB is connected
+   useEffect(() => {
+       if (isDbConnected) {
+           fetch(`${API_BASE_URL}/api/public-settings`)
+               .then(res => res.json())
+               .then(data => {
+                   setAppSettings(prev => ({ 
+                       ...prev, 
+                       logoUrl: data.logoUrl || prev.logoUrl,
+                       loginBackgroundUrl: data.loginBackgroundUrl || prev.loginBackgroundUrl,
+                       systemName: data.systemName || prev.systemName
+                   }));
+               })
+               .catch(err => console.error("Failed to fetch public settings", err));
+       }
+   }, [isDbConnected]);
 
   // LOGIN HANDLER
   const handleLogin = (user: User, authToken: string) => {
@@ -179,6 +225,11 @@ const App: React.FC = () => {
             } else {
                expenseCats = catData.filter((c: any) => c.type === 'PENGELUARAN').map((c: any) => c.name);
                incomeCats = catData.filter((c: any) => c.type === 'PEMASUKAN').map((c: any) => c.name);
+
+               // Fallback: If no specific income categories exist, use expense categories (Shared Mode)
+               if (incomeCats.length === 0 && expenseCats.length > 0) {
+                  incomeCats = [...expenseCats];
+               }
             }
           }
           
@@ -189,6 +240,9 @@ const App: React.FC = () => {
             ...prev, 
             categories: expenseCats,
             incomeCategories: incomeCats,
+            logoUrl: settingsData?.logoUrl || prev.logoUrl,
+            loginBackgroundUrl: settingsData?.loginBackgroundUrl || prev.loginBackgroundUrl,
+            systemName: settingsData?.systemName || prev.systemName,
             database: { ...prev.database, isConnected: true } 
           }));
         };
@@ -271,7 +325,7 @@ const App: React.FC = () => {
       return (
         <BrowserRouter>
           <Routes>
-             <Route path="*" element={<Login onLogin={handleLogin} isDbConnected={isDbConnected} />} />
+             <Route path="*" element={<Login onLogin={handleLogin} isDbConnected={isDbConnected} logoUrl={appSettings.logoUrl} loginBackgroundUrl={appSettings.loginBackgroundUrl} systemName={appSettings.systemName} />} />
           </Routes>
         </BrowserRouter>
       );
@@ -281,7 +335,7 @@ const App: React.FC = () => {
     <BrowserRouter>
       <Routes>
         {/* Public/Auth Routes */}
-        <Route path="/login" element={!isLoggedIn ? <Login onLogin={handleLogin} isDbConnected={isDbConnected} /> : <Navigate to="/" />} />
+        <Route path="/login" element={!isLoggedIn ? <Login onLogin={handleLogin} isDbConnected={isDbConnected} logoUrl={appSettings.logoUrl} loginBackgroundUrl={appSettings.loginBackgroundUrl} systemName={appSettings.systemName} /> : <Navigate to="/" />} />
 
         {/* Employee Routes */}
         {currentUser?.role === 'employee' && (
@@ -293,6 +347,7 @@ const App: React.FC = () => {
                     categories={appSettings.categories}
                     onLogout={() => setShowLogoutModal(true)}
                     onProfileClick={() => setShowProfileModal(true)} 
+                    logoUrl={appSettings.logoUrl}
                 />
                 {renderSharedModals()}
               </>
@@ -302,13 +357,17 @@ const App: React.FC = () => {
         {/* Admin Routes */}
         {currentUser?.role !== 'employee' && (
           <Route element={
-              <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans">
+              <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
                 <Header 
                   user={currentUser} 
                   onLogoutClick={() => setShowLogoutModal(true)} 
                   toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
                   isDbConnected={isDbConnected}
                   onProfileClick={() => setShowProfileModal(true)}
+                  isDarkMode={isDarkMode}
+                  toggleDarkMode={toggleDarkMode}
+                  logoUrl={appSettings.logoUrl}
+                  systemName={appSettings.systemName}
                 />
                 <div className="flex flex-1 pt-16 overflow-hidden">
                   <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
@@ -326,18 +385,18 @@ const App: React.FC = () => {
                 {renderSharedModals()}
               </div>
           }>
-            <Route path="/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="ALL" />} />
+            <Route path="/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={isDarkMode} filterType="ALL" />} />
             <Route path="/jurnal" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
-          <Route path="/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
+            <Route path="/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
           
-          <Route path="/pengeluaran/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="EXPENSE" />} />
-          <Route path="/pengeluaran/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
-          <Route path="/reimburse" element={<ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onDeleteReimbursement={handleDeleteReimbursement} onUpdateReimbursementDetails={handleUpdateReimbursementDetails} onUpdateReimbursement={handleUpdateReimbursementStatus} categories={appSettings.categories} {...commonProps} />} />
-          <Route path="/pengeluaran/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
+            <Route path="/pengeluaran/dashboard" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={isDarkMode} filterType="EXPENSE" />} />
+            <Route path="/pengeluaran/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PENGELUARAN" filterType="PENGELUARAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
+            <Route path="/reimburse" element={<ReimbursementPage reimbursements={reimbursements} onAddReimbursement={handleAddReimbursement} onDeleteReimbursement={handleDeleteReimbursement} onUpdateReimbursementDetails={handleUpdateReimbursementDetails} onUpdateReimbursement={handleUpdateReimbursementStatus} categories={appSettings.categories} {...commonProps} />} />
+            <Route path="/pengeluaran/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PENGELUARAN" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
           
-          <Route path="/pemasukan/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
-          <Route path="/pemasukan/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PEMASUKAN" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
-          <Route path="/pemasukan/statistik" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={false} filterType="INCOME" />} />
+            <Route path="/pemasukan/tambah" element={<Journal onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} defaultType="PEMASUKAN" filterType="PEMASUKAN" initialView="LIST" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} {...commonProps} />} />
+            <Route path="/pemasukan/laporan" element={<Report transactions={transactions} reimbursements={reimbursements} fixedFilterType="PEMASUKAN" categories={appSettings.categories} incomeCategories={appSettings.incomeCategories} />} />
+            <Route path="/pemasukan/statistik" element={<Dashboard transactions={transactions} reimbursements={reimbursements} isDarkMode={isDarkMode} filterType="INCOME" />} />
             
             <Route path="/pegawai" element={<EmployeeManager {...commonProps} />} />
             <Route path="/notifikasi" element={<NotificationManager {...commonProps} />} />

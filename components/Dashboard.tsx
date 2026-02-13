@@ -211,12 +211,12 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, reimbursements, isD
                   }}
                   itemStyle={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}
                 />
-                <Bar dataKey="value" fill={filterType === 'INCOME' ? '#10b981' : filterType === 'EXPENSE' ? '#f43f5e' : '#3b82f6'} radius={[4, 4, 0, 0]}>
+                <Bar dataKey="value" fill={filterType === 'INCOME' ? '#10b981' : filterType === 'EXPENSE' ? '#f43f5e' : '#0f172a'} radius={[4, 4, 0, 0]}>
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={
                       filterType === 'INCOME' ? (index % 2 === 0 ? '#10b981' : '#34d399') :
                       filterType === 'EXPENSE' ? (index % 2 === 0 ? '#f43f5e' : '#fb7185') :
-                      (index % 2 === 0 ? '#3b82f6' : '#60a5fa')
+                      (index % 2 === 0 ? '#0f172a' : '#334155')
                     } />
                   ))}
                 </Bar>

@@ -11,9 +11,10 @@ interface EmployeeDashboardProps {
   categories: string[];
   onLogout: () => void;
   onProfileClick: () => void;
+  logoUrl?: string;
 }
 
-const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, categories, onLogout, onProfileClick }) => {
+const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, categories, onLogout, onProfileClick, logoUrl }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isReimbursementPage = location.pathname.includes('/reimburse');
@@ -184,8 +185,12 @@ const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ user, authToken, 
         </div>
         
         {/* Logo */}
-        <div className="absolute top-6 left-6 z-20">
-           <img src="https://ruangdimensirecords.com/img/logo.png" alt="Logo" className="h-8 w-auto brightness-0 invert" />
+        <div className="absolute top-6 left-6 z-20 w-[100px]">
+           {logoUrl ? (
+               <img src={logoUrl.startsWith('/uploads') ? `${API_BASE_URL}${logoUrl}` : logoUrl} alt="Logo" className="w-full h-auto brightness-0 invert object-contain" />
+           ) : (
+               <img src="https://ruangdimensirecords.com/img/logo.png" alt="Logo" className="h-8 w-auto brightness-0 invert" />
+           )}
         </div>
 
         <div className="flex justify-between items-start mb-6 relative z-10 pt-8">

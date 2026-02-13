@@ -70,6 +70,9 @@ export interface DatabaseConfig {
 export interface AppSettings {
   categories: string[]; // Expense Categories (kept for backward compatibility/simplicity)
   incomeCategories: string[]; // New Income Categories
+  logoUrl?: string;
+  loginBackgroundUrl?: string;
+  systemName?: string;
   database: DatabaseConfig;
 }
 

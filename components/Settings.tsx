@@ -11,7 +11,7 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authToken }) => {
-  const [activeTab, setActiveTab] = useState<'GENERAL' | 'DATABASE' | 'USERS'>('GENERAL');
+  const [activeTab, setActiveTab] = useState<'GENERAL' | 'DATABASE' | 'USERS' | 'APPEARANCE'>('GENERAL');
   
   // Local state
   const [newCategory, setNewCategory] = useState('');
@@ -24,6 +24,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
   const [newPassword, setNewPassword] = useState('');
   const [userLoading, setUserLoading] = useState(false);
   const [categoryLoading, setCategoryLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [bgUploading, setBgUploading] = useState(false);
   
   const [isTestingDB, setIsTestingDB] = useState(false);
   const [dbMessage, setDbMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
@@ -47,6 +49,79 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
           console.error("Failed to fetch users");
       }
   }
+
+  // --- Upload Handlers ---
+  const handleUploadSetting = async (e: React.ChangeEvent<HTMLInputElement>, settingKey: 'logoUrl' | 'loginBackgroundUrl') => {
+      const file = e.target.files?.[0];
+      if (!file || !authToken) return;
+
+      if (settingKey === 'logoUrl') setLogoUploading(true);
+      else setBgUploading(true);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+          // 1. Upload File
+          const res = await fetch(`${API_BASE_URL}/api/upload`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${authToken}` },
+              body: formData
+          });
+          const data = await res.json();
+          
+          if (data.status === 'success') {
+              const url = data.url;
+              
+              // 2. Save Setting
+              const saveRes = await fetch(`${API_BASE_URL}/api/settings`, {
+                  method: 'POST',
+                  headers: { 
+                      'Content-Type': 'application/json', 
+                      'Authorization': `Bearer ${authToken}` 
+                  },
+                  body: JSON.stringify({ key: settingKey, value: url })
+              });
+              
+              if (saveRes.ok) {
+                  onUpdateSettings({ ...settings, [settingKey]: url });
+                  alert('Pengaturan berhasil diperbarui');
+              } else {
+                  alert('Gagal menyimpan pengaturan');
+              }
+          } else {
+              alert('Gagal mengupload gambar');
+          }
+      } catch (err) {
+          console.error(err);
+          alert('Terjadi kesalahan saat upload');
+      } finally {
+          if (settingKey === 'logoUrl') setLogoUploading(false);
+          else setBgUploading(false);
+      }
+  };
+
+  const handleSaveSystemName = async () => {
+    if (!authToken) return;
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/settings`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Authorization': `Bearer ${authToken}` 
+            },
+            body: JSON.stringify({ key: 'systemName', value: settings.systemName })
+        });
+        if (res.ok) {
+            alert('Nama Sistem berhasil disimpan');
+        } else {
+            alert('Gagal menyimpan Nama Sistem');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Terjadi kesalahan');
+    }
+  };
 
   // --- Category Handlers ---
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -227,12 +302,114 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdateSettings, authTok
         >
           Database
         </button>
+        <button
+          onClick={() => setActiveTab('APPEARANCE')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'APPEARANCE' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          Tampilan
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* CONTENT AREA */}
         <div className="md:col-span-2 space-y-6">
+          
+          {activeTab === 'APPEARANCE' && (
+            <div className="space-y-6 animate-fade-in">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Pengaturan Tampilan</h3>
+                
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-6 rounded-lg border border-slate-200 dark:border-slate-600 mb-6">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Nama Sistem</label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Nama yang akan muncul di bawah logo pada halaman login dan di header admin.</p>
+                  <div className="flex gap-3">
+                      <input 
+                        type="text" 
+                        value={settings.systemName || ''}
+                        onChange={(e) => onUpdateSettings({ ...settings, systemName: e.target.value })}
+                        placeholder="Contoh: Sistem Keuangan RDR"
+                        className="flex-1 rounded-lg border-slate-300 bg-white text-slate-900 border p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      <button 
+                        onClick={handleSaveSystemName}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                      >
+                        Simpan
+                      </button>
+                  </div>
+                </div>
+                
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-6 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Logo Aplikasi</label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Upload logo perusahaan (Format: PNG/JPG, Max 2MB). Logo ini akan muncul di Header dan Halaman Login.</p>
+                  
+                  <div className="flex items-start gap-6">
+                    <div className="w-32 h-32 bg-white dark:bg-slate-800 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center overflow-hidden relative group">
+                      {settings.logoUrl ? (
+                         <img src={settings.logoUrl.startsWith('/uploads') ? `${API_BASE_URL}${settings.logoUrl}` : settings.logoUrl} alt="Logo Preview" className="w-full h-full object-contain" />
+                      ) : (
+                         <div className="text-center p-2">
+                           <p className="text-xs text-slate-400">Belum ada logo</p>
+                         </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => handleUploadSetting(e, 'logoUrl')}
+                        className="block w-full text-sm text-slate-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100
+                          transition-colors
+                        "
+                      />
+                      {logoUploading && <p className="text-xs text-blue-600 mt-2 animate-pulse">Mengupload...</p>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-700/50 p-6 rounded-lg border border-slate-200 dark:border-slate-600 mt-6">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Background Login</label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Upload gambar background untuk halaman login (Format: PNG/JPG, Max 2MB).</p>
+                  
+                  <div className="flex items-start gap-6">
+                    <div className="w-48 h-32 bg-slate-200 dark:bg-slate-800 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center overflow-hidden relative group">
+                      {settings.loginBackgroundUrl ? (
+                         <img src={settings.loginBackgroundUrl.startsWith('/uploads') ? `${API_BASE_URL}${settings.loginBackgroundUrl}` : settings.loginBackgroundUrl} alt="Bg Preview" className="w-full h-full object-cover" />
+                      ) : (
+                         <div className="text-center p-2">
+                           <p className="text-xs text-slate-400">Default</p>
+                         </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => handleUploadSetting(e, 'loginBackgroundUrl')}
+                        className="block w-full text-sm text-slate-500
+                          file:mr-4 file:py-2 file:px-4
+                          file:rounded-full file:border-0
+                          file:text-sm file:font-semibold
+                          file:bg-blue-50 file:text-blue-700
+                          hover:file:bg-blue-100
+                          transition-colors
+                        "
+                      />
+                      {bgUploading && <p className="text-xs text-blue-600 mt-2 animate-pulse">Mengupload...</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* --- GENERAL TAB --- */}
           {activeTab === 'GENERAL' && (
