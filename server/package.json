@@ -6,7 +6,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "build": "npm --prefix .. run build",
+    "build:all": "npm --prefix .. ci && npm --prefix .. run build"
   },
   "dependencies": {
     "cors": "^2.8.5",
