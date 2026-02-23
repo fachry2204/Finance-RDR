@@ -118,7 +118,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true, logoUrl, l
                 type="text" 
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-slate-800 focus:ring-2 focus:ring-slate-100 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-slate-800 focus:ring-2 focus:ring-slate-100 outline-none transition-all text-slate-900 placeholder-slate-400"
                 placeholder="Masukkan username"
                 required
                 disabled={!isDbConnected}
@@ -134,7 +134,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, isDbConnected = true, logoUrl, l
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-slate-800 focus:ring-2 focus:ring-slate-100 outline-none transition-all"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-slate-800 focus:ring-2 focus:ring-slate-100 outline-none transition-all text-slate-900 placeholder-slate-400"
                 placeholder="Masukkan password"
                 required
                 disabled={!isDbConnected}

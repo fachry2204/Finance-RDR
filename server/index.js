@@ -685,14 +685,47 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 
 app.post('/api/users', authenticateToken, async (req, res) => {
     if (!pool) return res.status(500).json({ message: 'DB not connected' });
-    const { username, password } = req.body;
+    const { username, password, fullName } = req.body;
     try {
         const hashedPassword = hashPassword(password);
-        await pool.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, hashedPassword, 'admin']);
-        logActivity(req, `Tambah User Admin: ${username}`);
+        await pool.query('INSERT INTO users (username, password, role, full_name) VALUES (?, ?, ?, ?)', [username, hashedPassword, 'admin', fullName || null]);
+        logActivity(req, `Tambah User Admin: ${username}${fullName ? ` (${fullName})` : ''}`);
         res.json({ success: true, message: 'User created' });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to create user. Username might exist.' });
+    }
+});
+
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ message: 'DB not connected' });
+    const { id } = req.params;
+    const { username, fullName, password } = req.body;
+    try {
+        // Build dynamic query
+        const fields = [];
+        const params = [];
+        if (username && username.trim() !== '') {
+            fields.push('username = ?');
+            params.push(username);
+        }
+        if (typeof fullName === 'string') {
+            fields.push('full_name = ?');
+            params.push(fullName);
+        }
+        if (password && password.trim() !== '') {
+            fields.push('password = ?');
+            params.push(hashPassword(password));
+        }
+        if (fields.length === 0) {
+            return res.status(400).json({ success: false, message: 'Tidak ada perubahan' });
+        }
+        params.push(id);
+        const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+        await pool.query(sql, params);
+        logActivity(req, `Edit User Admin: ${id}`);
+        res.json({ success: true, message: 'User updated' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to update user' });
     }
 });
 
