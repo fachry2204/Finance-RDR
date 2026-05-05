@@ -51,6 +51,10 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
   // Image Preview Modal State
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // Delete Confirmation Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [reimbToDelete, setReimbToDelete] = useState<Reimbursement | null>(null);
+
   // Employee List State (for Admin dropdown)
   const [employeeList, setEmployeeList] = useState<any[]>([]);
 
@@ -276,13 +280,33 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
 
   const handleDelete = (e: React.MouseEvent, r: Reimbursement) => {
     e.stopPropagation();
-    if (r.status !== 'PENDING') {
-        alert("Hanya pengajuan berstatus PENDING yang dapat dihapus.");
+    
+    // Admin can delete PENDING, DITOLAK, or BERHASIL
+    // Employee can only delete PENDING
+    const canDelete = !isEmployeeView 
+      ? (r.status === 'PENDING' || r.status === 'BERHASIL' || r.status === 'DITOLAK')
+      : (r.status === 'PENDING');
+
+    if (!canDelete) {
+        alert("Status pengajuan ini tidak dapat dihapus.");
         return;
     }
-    if (window.confirm("Yakin ingin menghapus pengajuan reimburse ini?")) {
-        onDeleteReimbursement(r.id);
+
+    setReimbToDelete(r);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    if (reimbToDelete) {
+      onDeleteReimbursement(reimbToDelete.id);
+      setShowDeleteModal(false);
+      setReimbToDelete(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setReimbToDelete(null);
   };
 
   const getStatusColor = (status: ReimbursementStatus) => {
@@ -578,26 +602,31 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                            >
                              <Eye size={18} />
                            </button>
-                           {/* Allow Edit/Delete based on Status and View */}
+
+                           {/* Edit Button: Only PENDING/DITOLAK */}
                            {(r.status === 'PENDING' || r.status === 'DITOLAK') && (
-                             <>
+                             <button 
+                               onClick={(e) => handleEdit(e, r)}
+                               className="text-slate-500 hover:text-blue-600 p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                               title="Edit"
+                             >
+                               <Pencil size={18} />
+                             </button>
+                           )}
+
+                           {/* Delete Button: 
+                               Admin can delete PENDING, DITOLAK, BERHASIL.
+                               Employee can only delete PENDING.
+                           */}
+                           {((!isEmployeeView && (r.status === 'PENDING' || r.status === 'DITOLAK' || r.status === 'BERHASIL')) || 
+                             (isEmployeeView && r.status === 'PENDING')) && (
                                <button 
-                                 onClick={(e) => handleEdit(e, r)}
-                                 className="text-slate-500 hover:text-blue-600 p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                                 title="Edit"
+                                 onClick={(e) => handleDelete(e, r)}
+                                 className="text-slate-500 hover:text-rose-600 p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                                 title="Hapus"
                                >
-                                 <Pencil size={18} />
+                                 <Trash2 size={18} />
                                </button>
-                               {!isEmployeeView && (
-                                   <button 
-                                     onClick={(e) => handleDelete(e, r)}
-                                     className="text-slate-500 hover:text-rose-600 p-1 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
-                                     title="Hapus"
-                                   >
-                                     <Trash2 size={18} />
-                                   </button>
-                               )}
-                             </>
                            )}
                         </div>
                       </td>
@@ -835,6 +864,37 @@ const ReimbursementPage: React.FC<ReimbursementProps> = ({
                     <AlertCircle size={48} className="text-rose-400 mb-3" />
                     <p className="font-medium text-lg text-slate-700">Gambar Tidak Ditemukan</p>
                     <p className="text-sm mt-1">File mungkin telah dihapus atau path salah.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DELETE CONFIRMATION MODAL */}
+          {showDeleteModal && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black bg-opacity-60 backdrop-blur-sm animate-fade-in">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700 animate-scale-in">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/20 rounded-full flex items-center justify-center mb-4 text-rose-600 dark:text-rose-400">
+                    <Trash2 size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Konfirmasi Hapus</h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-6">
+                    Apakah Anda yakin ingin menghapus pengajuan reimburse <strong>{reimbToDelete?.activityName}</strong> dengan status <strong>{reimbToDelete?.status}</strong>? Tindakan ini tidak dapat dibatalkan.
+                  </p>
+                  <div className="flex gap-3 w-full">
+                    <button 
+                      onClick={cancelDelete}
+                      className="flex-1 px-4 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors"
+                    >
+                      Batal
+                    </button>
+                    <button 
+                      onClick={confirmDelete}
+                      className="flex-1 px-4 py-2.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium transition-colors shadow-sm shadow-rose-200 dark:shadow-none"
+                    >
+                      Ya, Hapus
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
